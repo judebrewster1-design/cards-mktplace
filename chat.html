@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Chat — The Long Box</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<header class="shop-sign">
+  <div class="shop-sign__inner">
+    <a href="index.html" class="shop-sign__title">🃏 The Long Box<small>PEI Card Exchange</small></a>
+    <nav class="shop-nav">
+      <a href="marketplace.html">Listings</a>
+      <a href="wanted.html">Wanted</a>
+      <a href="chat.html" class="active">Chat</a>
+      <a href="dashboard.html">My Shop</a>
+    </nav>
+    <div class="shop-nav" id="nav-auth-slot"></div>
+  </div>
+</header>
+
+<div class="wrap">
+  <h1 class="page-title">Shop chat</h1>
+  <p class="page-sub">/// One room, everybody's welcome — keep it civil, chats are filtered</p>
+
+  <div class="panel">
+    <div class="chat-box" style="height:520px;">
+      <div class="chat-messages" id="chat-messages">
+        <p style="font-family:var(--font-mono); font-size:0.8rem; opacity:0.6;">Loading…</p>
+      </div>
+      <form class="chat-input-row" id="chat-form">
+        <input id="chat-input" placeholder="Say something…" autocomplete="off" maxlength="500" />
+        <button class="btn btn-primary" type="submit">Send</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/api.js"></script>
+<script>
+  requireLogin();
+
+  const me = Session.user();
+  let pollTimer;
+  let lastRenderedId = 0;
+
+  async function loadMessages(initial) {
+    const box = document.getElementById("chat-messages");
+    try {
+      const { messages } = await api("/api/chat");
+      // only re-render when something actually changed, so we're not
+      // fighting the user's scroll position or text selection every 4s
+      const newestId = messages.length ? messages[messages.length - 1].id : 0;
+      if (!initial && newestId === lastRenderedId) return;
+      lastRenderedId = newestId;
+
+      box.innerHTML = messages.map(m => `
+        <div class="msg ${m.user_id === me.id ? "msg--me" : "msg--them"}">
+          ${m.user_id === me.id ? "" : `<strong style="display:block; font-size:0.68rem; opacity:0.7; margin-bottom:2px;">${escapeHtml(m.username)}</strong>`}
+          ${escapeHtml(m.body)}
+          <time>${timeAgo(m.created_at)}</time>
+        </div>
+      `).join("") || `<p style="font-family:var(--font-mono); font-size:0.8rem; opacity:0.6;">Nobody's said anything yet — be the first.</p>`;
+      box.scrollTop = box.scrollHeight;
+    } catch (err) {
+      if (initial) box.innerHTML = `<p style="opacity:0.7;">Couldn't load chat: ${escapeHtml(err.message)}</p>`;
+    }
+  }
+
+  document.getElementById("chat-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const input = document.getElementById("chat-input");
+    const body = input.value.trim();
+    if (!body) return;
+    input.value = "";
+    try {
+      await api("/api/chat", { method: "POST", body: { body } });
+      loadMessages(true);
+    } catch (err) {
+      toast(err.message);
+    }
+  });
+
+  loadMessages(true);
+  pollTimer = setInterval(() => loadMessages(false), 4000);
+  window.addEventListener("beforeunload", () => clearInterval(pollTimer));
+</script>
+</body>
+</html>
