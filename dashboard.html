@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>My Shop — The Long Box</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<header class="shop-sign">
+  <div class="shop-sign__inner">
+    <a href="index.html" class="shop-sign__title">🃏 The Long Box<small>PEI Card Exchange</small></a>
+    <nav class="shop-nav">
+      <a href="marketplace.html">Listings</a>
+      <a href="wanted.html">Wanted</a>
+      <a href="dashboard.html" class="active">My Shop</a>
+    </nav>
+    <div class="shop-nav" id="nav-auth-slot"></div>
+  </div>
+</header>
+
+<div class="wrap">
+  <h1 class="page-title">My Shop</h1>
+  <p class="page-sub">/// Basic settings, your active posts, and making new ones</p>
+
+  <div class="tabs">
+    <button class="active" data-tab="posts">My Posts</button>
+    <button data-tab="new">Make a Listing</button>
+    <button data-tab="settings">Settings</button>
+  </div>
+
+  <section id="tab-posts" class="panel">
+    <h2>Your active posts</h2>
+    <ul class="mini-list" id="my-listings">
+      <li>Loading…</li>
+    </ul>
+  </section>
+
+  <section id="tab-new" class="panel hidden">
+    <h2>Make a listing</h2>
+    <form id="listing-form">
+      <div class="two-col">
+        <div>
+          <label for="l-card">Card name</label>
+          <input id="l-card" required placeholder="Start typing… e.g. Mountain" autocomplete="off" />
+
+          <div class="card-picker hidden" id="card-picker">
+            <div class="card-picker__results" id="card-picker-results"></div>
+            <div class="card-picker__more-wrap hidden" id="card-picker-more-wrap">
+              <button type="button" class="btn btn-outline btn-small" id="card-picker-more">Load more</button>
+            </div>
+          </div>
+
+          <div class="selected-card hidden" id="selected-card"></div>
+
+          <label for="l-set">Set</label>
+          <input id="l-set" placeholder="e.g. Dominaria Remastered — fills in automatically once you pick a printing above" />
+
+          <div class="checkbox-row">
+            <input type="checkbox" id="l-foil" />
+            <label for="l-foil" style="margin:0;">This copy is foil</label>
+          </div>
+
+          <label for="l-condition">Condition</label>
+          <select id="l-condition">
+            <option>Near Mint</option>
+            <option>Lightly Played</option>
+            <option>Moderately Played</option>
+            <option>Heavily Played</option>
+            <option>Damaged</option>
+          </select>
+
+          <label for="l-price">Your price ($)</label>
+          <input id="l-price" type="number" step="0.01" min="0" required />
+
+          <label for="l-location">Pickup area</label>
+          <input id="l-location" placeholder="e.g. Charlottetown" required />
+
+          <label for="l-desc">Description (optional)</label>
+          <textarea id="l-desc" rows="3" placeholder="Any notes for the buyer"></textarea>
+        </div>
+
+        <div>
+          <label>Photo</label>
+          <div class="photo-drop" id="photo-drop">
+            <span id="photo-drop-label">Tap to take or choose your own photo — or pick a printing on the left and we'll use that card's photo</span>
+            <img id="photo-preview" class="hidden" />
+          </div>
+          <p class="photo-drop-note hidden" id="photo-source-note"></p>
+          <input type="file" id="l-photo" accept="image/*" capture="environment" class="hidden" />
+        </div>
+      </div>
+
+      <div class="field-error" id="l-error"></div>
+      <button class="btn btn-primary" style="margin-top:16px;" type="submit">Post listing</button>
+    </form>
+  </section>
+
+  <section id="tab-settings" class="panel hidden">
+    <h2>Basic settings</h2>
+    <label for="s-location">Your PEI location</label>
+    <input id="s-location" />
+    <button class="btn btn-secondary" id="save-settings" style="margin-top:14px;">Save</button>
+  </section>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/api.js"></script>
+<script>
+  requireLogin();
+
+  // --- tab switching ---
+  document.querySelectorAll(".tabs button").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".tabs button").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      ["posts", "new", "settings"].forEach((t) => {
+        document.getElementById("tab-" + t).classList.toggle("hidden", t !== btn.dataset.tab);
+      });
+    });
+  });
+
+  // --- my listings ---
+  async function loadMine() {
+    const list = document.getElementById("my-listings");
+    try {
+      const data = await api("/api/listings/mine");
+      if (!data.listings.length) {
+        list.innerHTML = `<li>You haven't posted anything yet. Try the "Make a Listing" tab.</li>`;
+        return;
+      }
+      list.innerHTML = data.listings.map(l => `
+        <li>
+          <span><strong>${escapeHtml(l.card_name)}</strong> — $${Number(l.price).toFixed(2)}
+            <br><small style="opacity:0.65;">${escapeHtml(l.condition)} · posted ${timeAgo(l.created_at)}</small>
+          </span>
+          <button class="btn btn-outline btn-small" data-id="${l.id}">Remove</button>
+        </li>
+      `).join("");
+      list.querySelectorAll("button[data-id]").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          if (!confirm("Take this listing down?")) return;
+          try {
+            await api("/api/listings/" + btn.dataset.id, { method: "DELETE" });
+            toast("Listing removed");
+            loadMine();
+          } catch (err) {
+            toast(err.message);
+          }
+        });
+      });
+    } catch (err) {
+      list.innerHTML = `<li>Couldn't load: ${escapeHtml(err.message)}</li>`;
+    }
+  }
+  loadMine();
+
+  // --- photo capture ---
+  const photoInput = document.getElementById("l-photo");
+  const photoDrop = document.getElementById("photo-drop");
+  const photoPreview = document.getElementById("photo-preview");
+  const photoLabel = document.getElementById("photo-drop-label");
+  const photoSourceNote = document.getElementById("photo-source-note");
+  let selectedPhotoUrl = null; // set when a printing is picked; a manual upload always wins over this
+  photoDrop.addEventListener("click", () => photoInput.click());
+  photoInput.addEventListener("change", () => {
+    const file = photoInput.files[0];
+    if (!file) return;
+    photoPreview.src = URL.createObjectURL(file);
+    photoPreview.classList.remove("hidden");
+    photoLabel.classList.add("hidden");
+    photoSourceNote.textContent = "Using your uploaded photo.";
+    photoSourceNote.classList.remove("hidden");
+  });
+
+  // --- card search picker: grouped by set, 4-wide image grid, "Load more" ---
+  let currentMarketPrice = null;
+  let pickerResults = [];
+  let pickerVisible = 20;
+  const PICKER_PAGE = 20;
+
+  const cardInput = document.getElementById("l-card");
+  const setInput = document.getElementById("l-set");
+  const foilCheckbox = document.getElementById("l-foil");
+  const pickerBox = document.getElementById("card-picker");
+  const pickerResultsEl = document.getElementById("card-picker-results");
+  const pickerMoreWrap = document.getElementById("card-picker-more-wrap");
+  const pickerMoreBtn = document.getElementById("card-picker-more");
+  const selectedBox = document.getElementById("selected-card");
+
+  function groupPrintingsBySet(printings) {
+    const map = new Map();
+    for (const p of printings) {
+      if (!map.has(p.set_code)) map.set(p.set_code, { set_name: p.set_name, released_at: p.released_at, items: [] });
+      map.get(p.set_code).items.push(p);
+    }
+    // newest set first — so e.g. a "mountain" search surfaces recent sets
+    // like Brothers War near the top instead of A-Z across hundreds of prints
+    return [...map.values()].sort((a, b) => (b.released_at || "").localeCompare(a.released_at || ""));
+  }
+
+  function cardPickerItem(p, idx) {
+    return `
+      <div class="card-picker__item" data-idx="${idx}" tabindex="0" role="button">
+        ${p.foil ? `<span class="card-picker__foil-chip">Foil</span>` : ""}
+        <img src="${p.image || 'https://placehold.co/146x204?text=No+Image'}" alt="${escapeHtml(p.name)}" loading="lazy" />
+        <div class="card-picker__item-name">${escapeHtml(p.name)}</div>
+        ${p.usd ? `<div class="card-picker__item-price">$${Number(p.usd).toFixed(2)}</div>` : `<div class="card-picker__item-price card-picker__item-price--none">no price</div>`}
+      </div>
+    `;
+  }
+
+  function renderPicker() {
+    if (!pickerResults.length) {
+      pickerResultsEl.innerHTML = `<p class="card-picker__empty">No matches found — you can still fill this in manually below.</p>`;
+      pickerMoreWrap.classList.add("hidden");
+      return;
+    }
+    const groups = groupPrintingsBySet(pickerResults);
+    let budget = pickerVisible;
+    let shown = 0;
+    let html = "";
+    for (const g of groups) {
+      if (budget <= 0) break;
+      const take = g.items.slice(0, budget);
+      if (!take.length) continue;
+      html += `
+        <div class="card-picker__set-group">
+          <div class="card-picker__set-heading">${escapeHtml(g.set_name)}${g.released_at ? " · " + g.released_at.slice(0, 4) : ""}</div>
+          <div class="card-picker__grid">
+            ${take.map((p) => cardPickerItem(p, pickerResults.indexOf(p))).join("")}
+          </div>
+        </div>
+      `;
+      budget -= take.length;
+      shown += take.length;
+    }
+    pickerResultsEl.innerHTML = html;
+    pickerResultsEl.querySelectorAll("[data-idx]").forEach((el) => {
+      el.addEventListener("click", () => selectPrinting(pickerResults[Number(el.dataset.idx)]));
+    });
+    pickerMoreWrap.classList.toggle("hidden", shown >= pickerResults.length);
+  }
+
+  pickerMoreBtn.addEventListener("click", () => {
+    pickerVisible += PICKER_PAGE;
+    renderPicker();
+  });
+
+  function selectPrinting(p) {
+    cardInput.value = p.name;
+    setInput.value = p.set_name;
+    foilCheckbox.checked = !!p.foil;
+    currentMarketPrice = p.usd;
+    pickerBox.classList.add("hidden");
+    selectedBox.classList.remove("hidden");
+    selectedBox.innerHTML = `
+      <img src="${p.image || 'https://placehold.co/146x204?text=No+Image'}" alt="" />
+      <span>${escapeHtml(p.name)} — ${escapeHtml(p.set_name)}${p.foil ? " (Foil)" : ""}${p.usd ? " · $" + Number(p.usd).toFixed(2) + " ref" : ""}</span>
+      <button type="button" class="btn btn-outline btn-small" id="clear-selection">Change</button>
+    `;
+    document.getElementById("clear-selection").addEventListener("click", () => {
+      selectedBox.classList.add("hidden");
+      cardInput.focus();
+    });
+
+    // use this printing's actual photo as the listing photo — a manual
+    // upload (if the seller adds one) always takes priority over this
+    if (!photoInput.files[0]) {
+      const art = p.image_large || p.image;
+      selectedPhotoUrl = art;
+      if (art) {
+        photoPreview.src = art;
+        photoPreview.classList.remove("hidden");
+        photoLabel.classList.add("hidden");
+        photoSourceNote.textContent = `Using the ${p.set_name} photo for ${p.name}. Want to show your actual copy instead? Tap the photo box to upload one.`;
+        photoSourceNote.classList.remove("hidden");
+      }
+    }
+  }
+
+  let searchTimer;
+  cardInput.addEventListener("input", () => {
+    clearTimeout(searchTimer);
+    selectedBox.classList.add("hidden");
+    if (selectedPhotoUrl && !photoInput.files[0]) {
+      selectedPhotoUrl = null;
+      photoPreview.classList.add("hidden");
+      photoLabel.classList.remove("hidden");
+      photoSourceNote.classList.add("hidden");
+    }
+    const q = cardInput.value.trim();
+    if (q.length < 2) { pickerBox.classList.add("hidden"); pickerResults = []; return; }
+    searchTimer = setTimeout(async () => {
+      pickerBox.classList.remove("hidden");
+      pickerResultsEl.innerHTML = `<p class="card-picker__empty">Searching…</p>`;
+      pickerMoreWrap.classList.add("hidden");
+      try {
+        const data = await api("/api/card-search?q=" + encodeURIComponent(q));
+        pickerResults = data.printings || [];
+        pickerVisible = PICKER_PAGE;
+        renderPicker();
+      } catch {
+        pickerResultsEl.innerHTML = `<p class="card-picker__empty">Search failed — you can still fill this in manually below.</p>`;
+      }
+    }, 350);
+  });
+
+  cardInput.addEventListener("focus", () => {
+    if (pickerResults.length) pickerBox.classList.remove("hidden");
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!pickerBox.contains(e.target) && e.target !== cardInput) {
+      pickerBox.classList.add("hidden");
+    }
+  });
+
+  // --- submit listing ---
+  document.getElementById("listing-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const errorEl = document.getElementById("l-error");
+    errorEl.textContent = "";
+    if (!photoInput.files[0] && !selectedPhotoUrl) {
+      errorEl.textContent = "A photo is required — upload your own, or pick a printing above to use its photo.";
+      return;
+    }
+
+    const fd = new FormData();
+    fd.append("card_name", document.getElementById("l-card").value.trim());
+    fd.append("set_name", document.getElementById("l-set").value.trim());
+    fd.append("condition", document.getElementById("l-condition").value);
+    fd.append("price", document.getElementById("l-price").value);
+    fd.append("location", document.getElementById("l-location").value.trim());
+    fd.append("description", document.getElementById("l-desc").value.trim());
+    if (currentMarketPrice) fd.append("market_price", currentMarketPrice);
+    fd.append("foil", document.getElementById("l-foil").checked ? "1" : "0");
+    if (photoInput.files[0]) {
+      fd.append("photo", photoInput.files[0]);
+    } else {
+      fd.append("photo_url", selectedPhotoUrl);
+    }
+
+    try {
+      await api("/api/listings", { method: "POST", body: fd, isForm: true });
+      toast("Listing posted!");
+      document.getElementById("listing-form").reset();
+      photoPreview.classList.add("hidden");
+      photoLabel.classList.remove("hidden");
+      photoSourceNote.classList.add("hidden");
+      selectedPhotoUrl = null;
+      selectedBox.classList.add("hidden");
+      pickerBox.classList.add("hidden");
+      pickerResults = [];
+      currentMarketPrice = null;
+      document.querySelector('.tabs button[data-tab="posts"]').click();
+      loadMine();
+    } catch (err) {
+      errorEl.textContent = err.message;
+    }
+  });
+
+  // --- settings ---
+  const user = Session.user();
+  if (user) document.getElementById("s-location").value = user.location || "";
+  document.getElementById("save-settings").addEventListener("click", async () => {
+    try {
+      const data = await api("/api/me", { method: "PATCH", body: { location: document.getElementById("s-location").value.trim() } });
+      Session.save(data.user, Session.token());
+      toast("Settings saved");
+    } catch (err) {
+      toast(err.message);
+    }
+  });
+</script>
+</body>
+</html>
