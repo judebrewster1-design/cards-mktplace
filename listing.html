@@ -26,8 +26,7 @@
   </div>
 
   <div class="panel hidden" id="chat-panel">
-    <h2>Messages</h2>
-    <div class="thread-picker hidden" id="thread-picker"></div>
+    <h2>Chat with the seller</h2>
     <div class="chat-box">
       <div class="chat-messages" id="chat-messages"></div>
       <form class="chat-input-row" id="chat-form">
@@ -37,14 +36,6 @@
     </div>
   </div>
   <p class="page-sub hidden" id="login-to-chat">Log in to message the seller.</p>
-
-  <div class="panel" id="reviews-panel">
-    <h2>Seller reviews</h2>
-    <div id="rate-seller-slot"></div>
-    <div class="reviews-list" id="reviews-list">
-      <p style="font-family: var(--font-mono); font-size:0.8rem; opacity:0.6;">Loading reviews…</p>
-    </div>
-  </div>
 </div>
 
 <script src="js/config.js"></script>
@@ -52,10 +43,6 @@
 <script>
   const id = new URLSearchParams(location.search).get("id");
   let pollTimer;
-  let isOwner = false;
-  let activeOtherId = null;
-  let currentListing = null;
-  let selectedStars = 0;
 
   function priceTagClass(price, marketPrice) {
     if (!marketPrice) return "";
@@ -64,43 +51,30 @@
     return "";
   }
 
-  function starString(rating) {
-    const full = Math.round(rating);
-    return "★".repeat(full) + "☆".repeat(5 - full);
-  }
-
   async function loadListing() {
     const box = document.getElementById("listing-detail");
     try {
       const { listing: l } = await api("/api/listings/" + id);
-      currentListing = l;
       const tagClass = priceTagClass(l.price, l.market_price);
-      const ratingLine = l.seller_rating
-        ? `<p class="seller-rating-line">${starString(l.seller_rating)}<small>${Number(l.seller_rating).toFixed(1)} · ${l.seller_rating_count} review${l.seller_rating_count === 1 ? "" : "s"}</small></p>`
-        : `<p class="seller-rating-line" style="color:var(--walnut); opacity:0.6;"><small>No reviews yet</small></p>`;
       box.innerHTML = `
         <div>
           <img src="${l.photo_url || 'https://placehold.co/400x560?text=No+Photo'}" style="width:100%; border-radius:6px; border:2px solid var(--line);" />
         </div>
         <div>
-          <h1 class="page-title" style="margin-bottom:2px;">${escapeHtml(l.card_name)}</h1>
+          <h1 class="page-title" style="margin-bottom:2px;">${escapeHtml(l.card_name)}${l.foil ? `<span class="foil-badge">Foil</span>` : ""}</h1>
           <p class="page-sub">${escapeHtml(l.set_name || "unknown set")} · ${escapeHtml(l.location || "PEI")}</p>
           <span class="price-tag ${tagClass}" style="font-size:1.2rem;">$${Number(l.price).toFixed(2)}</span>
           ${l.market_price ? `<span class="market-ref">market ref: $${Number(l.market_price).toFixed(2)}</span>` : ""}
           <div class="condition-badge" style="margin-top:10px;">${escapeHtml(l.condition)}</div>
           <p style="margin-top:18px;">${escapeHtml(l.description || "No extra notes from the seller.")}</p>
           <p style="font-family:var(--font-mono); font-size:0.75rem; opacity:0.7;">Listed by ${escapeHtml(l.username)} · ${timeAgo(l.created_at)}</p>
-          ${ratingLine}
         </div>
       `;
       setupChat(l);
-      setupReviews(l);
     } catch (err) {
       box.innerHTML = `<p>Couldn't load this listing: ${escapeHtml(err.message)}</p>`;
     }
   }
-
-  // ---------------- Messaging ----------------
 
   function setupChat(listing) {
     const user = Session.user();
@@ -108,27 +82,19 @@
       document.getElementById("login-to-chat").classList.remove("hidden");
       return;
     }
+    if (user.id === listing.user_id) return; // sellers don't chat with themselves
     document.getElementById("chat-panel").classList.remove("hidden");
-    isOwner = user.id === listing.user_id;
-
-    if (isOwner) {
-      loadThreads(listing);
-    } else {
-      activeOtherId = listing.user_id;
-      startChat();
-    }
+    loadMessages();
+    pollTimer = setInterval(loadMessages, 4000);
 
     document.getElementById("chat-form").addEventListener("submit", async (e) => {
       e.preventDefault();
       const input = document.getElementById("chat-input");
       const body = input.value.trim();
       if (!body) return;
-      if (isOwner && !activeOtherId) { toast("Pick a conversation first."); return; }
       input.value = "";
       try {
-        const payload = { body };
-        if (isOwner) payload.to = activeOtherId;
-        await api("/api/messages/" + id, { method: "POST", body: payload });
+        await api("/api/messages/" + id, { method: "POST", body: { body } });
         loadMessages();
       } catch (err) {
         toast(err.message);
@@ -136,54 +102,11 @@
     });
   }
 
-  // for the seller: show one row per buyer who's messaged, pick one to open
-  async function loadThreads(listing) {
-    const picker = document.getElementById("thread-picker");
-    try {
-      const { threads } = await api("/api/messages/" + id + "/threads");
-      if (!threads.length) {
-        picker.classList.add("hidden");
-        document.getElementById("chat-messages").innerHTML =
-          `<p style="font-family:var(--font-mono); font-size:0.8rem; opacity:0.6;">No one has messaged you about this listing yet.</p>`;
-        document.getElementById("chat-form").classList.add("hidden");
-        return;
-      }
-      picker.classList.remove("hidden");
-      picker.innerHTML = threads.map(t => `
-        <button type="button" class="thread-btn" data-id="${t.user_id}">
-          👤 ${escapeHtml(t.username)}
-          <small>${t.last_body ? escapeHtml(t.last_body.slice(0, 40)) : ""}</small>
-        </button>
-      `).join("");
-      picker.querySelectorAll(".thread-btn").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          picker.querySelectorAll(".thread-btn").forEach((b) => b.classList.remove("thread-btn--active"));
-          btn.classList.add("thread-btn--active");
-          activeOtherId = Number(btn.dataset.id);
-          document.getElementById("chat-form").classList.remove("hidden");
-          startChat();
-        });
-      });
-      // auto-open the first (most recent) thread
-      picker.querySelector(".thread-btn").click();
-    } catch (err) {
-      picker.classList.add("hidden");
-    }
-  }
-
-  function startChat() {
-    clearInterval(pollTimer);
-    loadMessages();
-    pollTimer = setInterval(loadMessages, 4000);
-  }
-
   async function loadMessages() {
     const user = Session.user();
     const box = document.getElementById("chat-messages");
-    if (isOwner && !activeOtherId) return;
     try {
-      const url = "/api/messages/" + id + (activeOtherId ? "?with=" + activeOtherId : "");
-      const { messages } = await api(url);
+      const { messages } = await api("/api/messages/" + id);
       box.innerHTML = messages.map(m => `
         <div class="msg ${m.sender_id === user.id ? "msg--me" : "msg--them"}">
           ${escapeHtml(m.body)}
@@ -197,71 +120,6 @@
   }
 
   window.addEventListener("beforeunload", () => clearInterval(pollTimer));
-
-  // ---------------- Seller reviews ----------------
-
-  function setupReviews(listing) {
-    const user = Session.user();
-    const slot = document.getElementById("rate-seller-slot");
-    if (!user) {
-      slot.innerHTML = `<p class="page-sub">Log in to rate this seller.</p>`;
-    } else if (user.id === listing.user_id) {
-      slot.innerHTML = "";
-    } else {
-      slot.innerHTML = `
-        <div class="rate-seller">
-          <h3>Rate ${escapeHtml(listing.username)}</h3>
-          <div class="star-select" id="star-select">
-            ${[1, 2, 3, 4, 5].map(n => `<span data-star="${n}">★</span>`).join("")}
-          </div>
-          <textarea id="rate-comment" rows="2" placeholder="Optional — how did the trade go?"></textarea>
-          <button class="btn btn-secondary btn-small" id="submit-rating">Submit rating</button>
-        </div>
-      `;
-      const stars = slot.querySelectorAll("#star-select span");
-      stars.forEach((s) => {
-        s.addEventListener("click", () => {
-          selectedStars = Number(s.dataset.star);
-          stars.forEach((s2) => s2.classList.toggle("active", Number(s2.dataset.star) <= selectedStars));
-        });
-      });
-      document.getElementById("submit-rating").addEventListener("click", async () => {
-        if (!selectedStars) { toast("Pick a star rating first."); return; }
-        try {
-          await api("/api/sellers/" + listing.user_id + "/rating", {
-            method: "POST",
-            body: { stars: selectedStars, comment: document.getElementById("rate-comment").value.trim(), listing_id: Number(id) },
-          });
-          toast("Thanks for the rating!");
-          loadReviews(listing.user_id);
-        } catch (err) {
-          toast(err.message);
-        }
-      });
-    }
-    loadReviews(listing.user_id);
-  }
-
-  async function loadReviews(sellerId) {
-    const box = document.getElementById("reviews-list");
-    try {
-      const { ratings } = await api("/api/sellers/" + sellerId + "/ratings");
-      if (!ratings.length) {
-        box.innerHTML = `<p style="font-family:var(--font-mono); font-size:0.8rem; opacity:0.6;">No reviews yet.</p>`;
-        return;
-      }
-      box.innerHTML = ratings.map(r => `
-        <div class="review">
-          <span class="review__stars">${starString(r.stars)}</span>
-          <span class="review__meta">${escapeHtml(r.rater_username)} · ${timeAgo(r.created_at)}</span>
-          ${r.comment ? `<p class="review__body">${escapeHtml(r.comment)}</p>` : ""}
-        </div>
-      `).join("");
-    } catch (err) {
-      box.innerHTML = `<p>Couldn't load reviews.</p>`;
-    }
-  }
-
   loadListing();
 </script>
 </body>
