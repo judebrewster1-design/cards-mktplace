@@ -64,24 +64,17 @@
     return "";
   }
 
-  function starString(rating) {
-    if (!rating) return "";
-    const full = Math.round(rating);
-    return "★".repeat(full) + "☆".repeat(5 - full);
-  }
-
   function cardTemplate(l) {
     const tilt = (Math.random() * 4 - 2).toFixed(1);
     const tagClass = priceTagClass(l.price, l.market_price);
     return `
       <a class="card-pin" style="--tilt:${tilt}deg" href="listing.html?id=${l.id}">
         <img src="${l.photo_url || 'https://placehold.co/300x420?text=No+Photo'}" alt="${escapeHtml(l.card_name)} photo" />
-        <div class="card-pin__name">${escapeHtml(l.card_name)}</div>
+        <div class="card-pin__name">${escapeHtml(l.card_name)}${l.foil ? `<span class="foil-badge">Foil</span>` : ""}</div>
         <div class="card-pin__set">${escapeHtml(l.set_name || "unknown set")} • ${escapeHtml(l.location || "PEI")}</div>
         <span class="price-tag ${tagClass}">$${Number(l.price).toFixed(2)}</span>
         ${l.market_price ? `<span class="market-ref">market ref: $${Number(l.market_price).toFixed(2)}</span>` : ""}
         <div class="condition-badge">${escapeHtml(l.condition)}</div>
-        ${l.seller_rating ? `<div class="seller-rating-badge">${starString(l.seller_rating)} <small>${Number(l.seller_rating).toFixed(1)} (${l.seller_rating_count})</small></div>` : `<div class="seller-rating-badge seller-rating-badge--none"><small>No ratings yet</small></div>`}
       </a>
     `;
   }
