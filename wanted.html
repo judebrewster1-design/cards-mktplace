@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Wanted — The Long Box</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<header class="shop-sign">
+  <div class="shop-sign__inner">
+    <a href="index.html" class="shop-sign__title">🃏 The Long Box<small>PEI Card Exchange</small></a>
+    <nav class="shop-nav">
+      <a href="marketplace.html">Listings</a>
+      <a href="wanted.html">Wanted</a>
+      <a href="dashboard.html">My Shop</a>
+    </nav>
+    <div class="shop-nav" id="nav-auth-slot"></div>
+  </div>
+</header>
+
+<div class="wrap">
+  <h1 class="page-title">Wanted board</h1>
+  <p class="page-sub">/// Post what you're hunting for — sellers can spot it and reach out</p>
+
+  <div class="panel">
+    <h2>Post a want</h2>
+    <form id="wanted-form">
+      <div class="two-col">
+        <div>
+          <label for="w-card">Card name</label>
+          <input id="w-card" required placeholder="e.g. Sol Ring" />
+        </div>
+        <div>
+          <label for="w-max">Max you'll pay (optional)</label>
+          <input id="w-max" type="number" step="0.01" min="0" placeholder="$" />
+        </div>
+      </div>
+      <label for="w-notes">Notes</label>
+      <textarea id="w-notes" rows="3" placeholder="Condition you'd accept, foil or not, etc."></textarea>
+      <div class="field-error" id="w-error"></div>
+      <button class="btn btn-primary" style="margin-top:12px;" type="submit">Post want</button>
+    </form>
+  </div>
+
+  <div class="panel">
+    <h2>Currently wanted</h2>
+    <ul class="mini-list" id="wanted-list">
+      <li>Loading…</li>
+    </ul>
+  </div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/api.js"></script>
+<script>
+  async function loadWanted() {
+    const list = document.getElementById("wanted-list");
+    try {
+      const data = await api("/api/wanted");
+      if (!data.wanted.length) {
+        list.innerHTML = `<li>Nobody's posted a want yet.</li>`;
+        return;
+      }
+      list.innerHTML = data.wanted.map(w => `
+        <li>
+          <span><strong>${escapeHtml(w.card_name)}</strong> — ${escapeHtml(w.notes || "no notes")}
+            <br><small style="opacity:0.65;">by ${escapeHtml(w.username)} · ${timeAgo(w.created_at)}</small>
+          </span>
+          <span>${w.max_price ? "up to $" + Number(w.max_price).toFixed(2) : ""}</span>
+        </li>
+      `).join("");
+    } catch (err) {
+      list.innerHTML = `<li>Couldn't load: ${escapeHtml(err.message)}</li>`;
+    }
+  }
+
+  document.getElementById("wanted-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (!Session.isLoggedIn()) { window.location.href = "index.html"; return; }
+    const errorEl = document.getElementById("w-error");
+    errorEl.textContent = "";
+    try {
+      await api("/api/wanted", {
+        method: "POST",
+        body: {
+          card_name: document.getElementById("w-card").value.trim(),
+          max_price: document.getElementById("w-max").value || null,
+          notes: document.getElementById("w-notes").value.trim(),
+        },
+      });
+      document.getElementById("wanted-form").reset();
+      toast("Posted to the wanted board");
+      loadWanted();
+    } catch (err) {
+      errorEl.textContent = err.message;
+    }
+  });
+
+  loadWanted();
+</script>
+</body>
+</html>

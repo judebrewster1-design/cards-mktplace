@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>The Long Box — PEI Card Exchange</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<header class="shop-sign">
+  <div class="shop-sign__inner">
+    <a href="index.html" class="shop-sign__title">
+      🃏 The Long Box
+      <small>PEI Card Exchange</small>
+    </a>
+  </div>
+</header>
+
+<div class="auth-shell">
+  <div class="auth-card">
+    <h1 id="auth-heading">Welcome in</h1>
+    <div class="auth-tabs">
+      <button id="tab-login" class="active">Log In</button>
+      <button id="tab-signup">Sign Up</button>
+    </div>
+
+    <form id="login-form">
+      <label for="login-username">Username</label>
+      <input id="login-username" required autocomplete="username" />
+      <label for="login-password">Password</label>
+      <input id="login-password" type="password" required autocomplete="current-password" />
+      <div class="checkbox-row">
+        <input type="checkbox" id="login-remember" checked />
+        <label for="login-remember" style="margin:0;">Keep me signed in on this device</label>
+      </div>
+      <div class="field-error" id="login-error"></div>
+      <button class="btn btn-primary btn-full" style="margin-top:10px;" type="submit">Step inside</button>
+    </form>
+
+    <form id="signup-form" class="hidden">
+      <label for="signup-username">Choose a username</label>
+      <input id="signup-username" required minlength="3" maxlength="20" pattern="[A-Za-z0-9_]+" title="Letters, numbers, underscores only" />
+      <label for="signup-password">Choose a password</label>
+      <input id="signup-password" type="password" required minlength="6" autocomplete="new-password" />
+      <label for="signup-location">Where in PEI?</label>
+      <input id="signup-location" placeholder="e.g. Charlottetown, Summerside, Montague" required />
+      <div class="field-error" id="signup-error"></div>
+      <button class="btn btn-primary btn-full" style="margin-top:10px;" type="submit">Open a tab</button>
+    </form>
+
+    <p style="font-family: var(--font-mono); font-size: 0.7rem; opacity:0.6; margin-top:18px; margin-bottom:0;">
+      By joining you agree to keep it civil — listings and chats are filtered, and the shop owner can pull anything down.
+    </p>
+  </div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/api.js"></script>
+<script>
+  // If already logged in, skip straight to the marketplace.
+  if (Session.isLoggedIn()) window.location.href = "marketplace.html";
+
+  const tabLogin = document.getElementById("tab-login");
+  const tabSignup = document.getElementById("tab-signup");
+  const loginForm = document.getElementById("login-form");
+  const signupForm = document.getElementById("signup-form");
+  const heading = document.getElementById("auth-heading");
+
+  tabLogin.addEventListener("click", () => {
+    tabLogin.classList.add("active"); tabSignup.classList.remove("active");
+    loginForm.classList.remove("hidden"); signupForm.classList.add("hidden");
+    heading.textContent = "Welcome in";
+  });
+  tabSignup.addEventListener("click", () => {
+    tabSignup.classList.add("active"); tabLogin.classList.remove("active");
+    signupForm.classList.remove("hidden"); loginForm.classList.add("hidden");
+    heading.textContent = "New face around here";
+  });
+
+  loginForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const errorEl = document.getElementById("login-error");
+    errorEl.textContent = "";
+    try {
+      const data = await api("/api/login", {
+        method: "POST",
+        body: {
+          username: document.getElementById("login-username").value.trim(),
+          password: document.getElementById("login-password").value,
+        },
+      });
+      Session.save(data.user, data.token);
+      window.location.href = "marketplace.html";
+    } catch (err) {
+      errorEl.textContent = err.message;
+    }
+  });
+
+  signupForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const errorEl = document.getElementById("signup-error");
+    errorEl.textContent = "";
+    try {
+      const data = await api("/api/register", {
+        method: "POST",
+        body: {
+          username: document.getElementById("signup-username").value.trim(),
+          password: document.getElementById("signup-password").value,
+          location: document.getElementById("signup-location").value.trim(),
+        },
+      });
+      Session.save(data.user, data.token);
+      window.location.href = "marketplace.html";
+    } catch (err) {
+      errorEl.textContent = err.message;
+    }
+  });
+</script>
+</body>
+</html>
