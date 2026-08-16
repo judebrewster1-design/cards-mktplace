@@ -44,9 +44,23 @@
         <div>
           <label for="l-card">Card name</label>
           <input id="l-card" required placeholder="Start typing… e.g. Lightning Bolt" autocomplete="off" />
-          <div class="price-suggest hidden" id="price-suggest"></div>
 
-          <label for="l-set">Set (optional)</label>
+          <div class="set-picker hidden" id="set-picker">
+            <p class="set-picker__hint">Matching cards & sets — foil prints show separately since price differs a lot:</p>
+            <div class="set-picker__row" id="set-picker-row"></div>
+          </div>
+
+          <div class="selected-card hidden" id="selected-card">
+            <img id="selected-card-img" alt="" />
+            <div>
+              <strong id="selected-card-name"></strong>
+              <div id="selected-card-set" class="selected-card__set"></div>
+              <div id="selected-card-price" class="selected-card__price"></div>
+              <button type="button" class="btn btn-outline btn-small" id="change-printing">Change</button>
+            </div>
+          </div>
+
+          <label for="l-set">Set</label>
           <input id="l-set" placeholder="e.g. Dominaria Remastered" />
 
           <label for="l-condition">Condition</label>
@@ -156,26 +170,68 @@
     photoLabel.classList.add("hidden");
   });
 
-  // --- live market price lookup (debounced) ---
-  let priceLookupTimer;
+  // --- live photo search-as-you-type: every set + foil/nonfoil, with images ---
+  const cardInput = document.getElementById("l-card");
+  const pickerWrap = document.getElementById("set-picker");
+  const pickerRow = document.getElementById("set-picker-row");
+  const selectedBox = document.getElementById("selected-card");
+  let searchTimer;
   let currentMarketPrice = null;
-  document.getElementById("l-card").addEventListener("input", (e) => {
-    clearTimeout(priceLookupTimer);
-    const name = e.target.value.trim();
-    const box = document.getElementById("price-suggest");
-    if (name.length < 3) { box.classList.add("hidden"); return; }
-    priceLookupTimer = setTimeout(async () => {
-      try {
-        const data = await api("/api/price?name=" + encodeURIComponent(name));
-        currentMarketPrice = data.usd;
-        box.classList.remove("hidden");
-        box.innerHTML = data.usd
-          ? `Market ref for <strong>${escapeHtml(data.name)}</strong> (${escapeHtml(data.set || "")}): <strong>$${Number(data.usd).toFixed(2)}</strong>`
-          : `No live price found for "${escapeHtml(name)}" — you can still list it.`;
-      } catch {
-        box.classList.add("hidden");
+  let selectedPrinting = null;
+
+  cardInput.addEventListener("input", (e) => {
+    clearTimeout(searchTimer);
+    selectedPrinting = null;
+    currentMarketPrice = null;
+    selectedBox.classList.add("hidden");
+    const q = e.target.value.trim();
+    if (q.length < 3) { pickerWrap.classList.add("hidden"); pickerRow.innerHTML = ""; return; }
+    searchTimer = setTimeout(() => searchPrintings(q), 350);
+  });
+
+  async function searchPrintings(q) {
+    pickerRow.innerHTML = `<p class="set-picker__loading">Searching sets…</p>`;
+    pickerWrap.classList.remove("hidden");
+    try {
+      const data = await api("/api/card-search?q=" + encodeURIComponent(q));
+      if (!data.printings || !data.printings.length) {
+        pickerRow.innerHTML = `<p class="set-picker__loading">No matches yet — keep typing, or check the spelling.</p>`;
+        return;
       }
-    }, 450);
+      pickerRow.innerHTML = data.printings.map((p, i) => `
+        <button type="button" class="set-card" data-index="${i}">
+          <img src="${p.image || 'https://placehold.co/146x204?text=No+Image'}" alt="${escapeHtml(p.name)}" />
+          <span class="set-card__name">${escapeHtml(p.name)}</span>
+          <span class="set-card__set">${escapeHtml(p.set_name)}${p.foil ? " · Foil" : ""}</span>
+          <span class="set-card__price">${p.usd ? "$" + Number(p.usd).toFixed(2) : "no price"}</span>
+        </button>
+      `).join("");
+      pickerRow.querySelectorAll(".set-card").forEach((btn) => {
+        btn.addEventListener("click", () => selectPrinting(data.printings[Number(btn.dataset.index)]));
+      });
+    } catch {
+      pickerRow.innerHTML = `<p class="set-picker__loading">Couldn't load sets right now.</p>`;
+    }
+  }
+
+  function selectPrinting(p) {
+    selectedPrinting = p;
+    currentMarketPrice = p.usd;
+    cardInput.value = p.name;
+    document.getElementById("l-set").value = p.set_name + (p.foil ? " (Foil)" : "");
+    document.getElementById("selected-card-img").src = p.image_large || p.image || 'https://placehold.co/146x204?text=No+Image';
+    document.getElementById("selected-card-name").textContent = p.name;
+    document.getElementById("selected-card-set").textContent = p.set_name + (p.foil ? " · Foil" : "");
+    document.getElementById("selected-card-price").textContent = p.usd
+      ? `Market ref: $${Number(p.usd).toFixed(2)}`
+      : "No live price for this printing";
+    selectedBox.classList.remove("hidden");
+    pickerWrap.classList.add("hidden");
+  }
+
+  document.getElementById("change-printing").addEventListener("click", () => {
+    selectedBox.classList.add("hidden");
+    pickerWrap.classList.remove("hidden");
   });
 
   // --- submit listing ---
