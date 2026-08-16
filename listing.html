@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Listing — The Long Box</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<header class="shop-sign">
+  <div class="shop-sign__inner">
+    <a href="index.html" class="shop-sign__title">🃏 The Long Box<small>PEI Card Exchange</small></a>
+    <nav class="shop-nav">
+      <a href="marketplace.html">Listings</a>
+      <a href="wanted.html">Wanted</a>
+      <a href="dashboard.html">My Shop</a>
+    </nav>
+    <div class="shop-nav" id="nav-auth-slot"></div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="two-col" id="listing-detail">
+    <p style="font-family: var(--font-mono);">Loading…</p>
+  </div>
+
+  <div class="panel hidden" id="chat-panel">
+    <h2>Chat with the seller</h2>
+    <div class="chat-box">
+      <div class="chat-messages" id="chat-messages"></div>
+      <form class="chat-input-row" id="chat-form">
+        <input id="chat-input" placeholder="Ask about condition, meet-up spot, etc." autocomplete="off" />
+        <button class="btn btn-primary" type="submit">Send</button>
+      </form>
+    </div>
+  </div>
+  <p class="page-sub hidden" id="login-to-chat">Log in to message the seller.</p>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/api.js"></script>
+<script>
+  const id = new URLSearchParams(location.search).get("id");
+  let pollTimer;
+
+  function priceTagClass(price, marketPrice) {
+    if (!marketPrice) return "";
+    if (price < marketPrice * 0.95) return "price-tag--under";
+    if (price > marketPrice * 1.05) return "price-tag--over";
+    return "";
+  }
+
+  async function loadListing() {
+    const box = document.getElementById("listing-detail");
+    try {
+      const { listing: l } = await api("/api/listings/" + id);
+      const tagClass = priceTagClass(l.price, l.market_price);
+      box.innerHTML = `
+        <div>
+          <img src="${l.photo_url || 'https://placehold.co/400x560?text=No+Photo'}" style="width:100%; border-radius:6px; border:2px solid var(--line);" />
+        </div>
+        <div>
+          <h1 class="page-title" style="margin-bottom:2px;">${escapeHtml(l.card_name)}</h1>
+          <p class="page-sub">${escapeHtml(l.set_name || "unknown set")} · ${escapeHtml(l.location || "PEI")}</p>
+          <span class="price-tag ${tagClass}" style="font-size:1.2rem;">$${Number(l.price).toFixed(2)}</span>
+          ${l.market_price ? `<span class="market-ref">market ref: $${Number(l.market_price).toFixed(2)}</span>` : ""}
+          <div class="condition-badge" style="margin-top:10px;">${escapeHtml(l.condition)}</div>
+          <p style="margin-top:18px;">${escapeHtml(l.description || "No extra notes from the seller.")}</p>
+          <p style="font-family:var(--font-mono); font-size:0.75rem; opacity:0.7;">Listed by ${escapeHtml(l.username)} · ${timeAgo(l.created_at)}</p>
+        </div>
+      `;
+      setupChat(l);
+    } catch (err) {
+      box.innerHTML = `<p>Couldn't load this listing: ${escapeHtml(err.message)}</p>`;
+    }
+  }
+
+  function setupChat(listing) {
+    const user = Session.user();
+    if (!user) {
+      document.getElementById("login-to-chat").classList.remove("hidden");
+      return;
+    }
+    if (user.id === listing.user_id) return; // sellers don't chat with themselves
+    document.getElementById("chat-panel").classList.remove("hidden");
+    loadMessages();
+    pollTimer = setInterval(loadMessages, 4000);
+
+    document.getElementById("chat-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const input = document.getElementById("chat-input");
+      const body = input.value.trim();
+      if (!body) return;
+      input.value = "";
+      try {
+        await api("/api/messages/" + id, { method: "POST", body: { body } });
+        loadMessages();
+      } catch (err) {
+        toast(err.message);
+      }
+    });
+  }
+
+  async function loadMessages() {
+    const user = Session.user();
+    const box = document.getElementById("chat-messages");
+    try {
+      const { messages } = await api("/api/messages/" + id);
+      box.innerHTML = messages.map(m => `
+        <div class="msg ${m.sender_id === user.id ? "msg--me" : "msg--them"}">
+          ${escapeHtml(m.body)}
+          <time>${timeAgo(m.created_at)}</time>
+        </div>
+      `).join("") || `<p style="font-family:var(--font-mono); font-size:0.8rem; opacity:0.6;">Say hello — ask about condition, foil, or where to meet up.</p>`;
+      box.scrollTop = box.scrollHeight;
+    } catch {
+      /* silent - keep polling */
+    }
+  }
+
+  window.addEventListener("beforeunload", () => clearInterval(pollTimer));
+  loadListing();
+</script>
+</body>
+</html>
