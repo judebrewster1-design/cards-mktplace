@@ -56,6 +56,15 @@ async function api(path, { method = "GET", body, isForm = false } = {}) {
 
   if (!res.ok) {
     const message = (data && data.error) || `Request failed (${res.status})`;
+    // account got banned/suspended (possibly mid-session, via the Telegram
+    // bot) - clear the stale session and send them back to the login screen
+    // instead of leaving a "logged in" UI that every request now 403s on
+    if (data && (data.banned || data.suspended_until)) {
+      Session.clear();
+      if (!/index\.html$/.test(location.pathname) && location.pathname !== "/") {
+        window.location.href = "index.html";
+      }
+    }
     throw new Error(message);
   }
   return data;
