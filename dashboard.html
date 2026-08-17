@@ -160,6 +160,8 @@
   photoInput.addEventListener("change", () => {
     const file = photoInput.files[0];
     if (!file) return;
+    // A manual upload always overrides whatever photo a picked printing supplied.
+    currentPhotoUrl = null;
     photoPreview.src = URL.createObjectURL(file);
     photoPreview.classList.remove("hidden");
     photoLabel.classList.add("hidden");
@@ -169,6 +171,7 @@
   let searchTimer;
   let currentMarketPrice = null;
   let currentFoil = false;
+  let currentPhotoUrl = null; // photo URL of a picked printing; cleared if the seller manually uploads their own file
   let lastResults = [];       // full printings list from the last search
   let visibleSetCount = 0;    // how many set-groups are currently rendered
   const SETS_PER_PAGE = 4;
@@ -252,7 +255,7 @@
             <div class="card-picker__item" tabindex="0" role="button"
                  data-set="${escapeHtml(setName)}"
                  data-name="${escapeHtml(p.name)}" data-price="${p.usd ?? ""}" data-foil="${p.foil ? "1" : "0"}"
-                 data-image="${escapeHtml(p.image || "")}">
+                 data-image="${escapeHtml(p.image || "")}" data-image-large="${escapeHtml(p.image_large || p.image || "")}">
               ${p.foil ? `<span class="card-picker__foil-chip">Foil</span>` : ""}
               <img src="${p.image || 'https://placehold.co/150x210?text=No+Image'}" alt="${escapeHtml(p.name)}" loading="lazy" onerror="this.onerror=null;this.src='https://placehold.co/150x210?text=No+Image';" />
               <div class="card-picker__item-name">${escapeHtml(p.name)}</div>
@@ -281,8 +284,18 @@
     setInput.value = data.set;
     currentMarketPrice = data.price ? parseFloat(data.price) : null;
     currentFoil = data.foil === "1";
+    // The picked printing's own photo becomes the listing photo — a manual
+    // upload (handled in the l-photo change listener below) still overrides
+    // this if the seller picks a file afterward.
+    currentPhotoUrl = data.imageLarge || data.image || null;
     pickerBox.classList.add("hidden");
     pickerBox.innerHTML = "";
+    // Manual upload, if any, no longer applies once a fresh card is picked —
+    // the picked printing's photo takes over as the listing photo.
+    photoInput.value = "";
+    photoPreview.src = currentPhotoUrl || "";
+    photoPreview.classList.toggle("hidden", !currentPhotoUrl);
+    photoLabel.classList.toggle("hidden", !!currentPhotoUrl);
     selectedBox.classList.remove("hidden");
     selectedBox.innerHTML = `
       <img src="${data.image || 'https://placehold.co/60x84?text=No+Image'}" alt="" onerror="this.onerror=null;this.src='https://placehold.co/60x84?text=No+Image';" />
@@ -296,6 +309,10 @@
       selectedBox.innerHTML = "";
       currentMarketPrice = null;
       currentFoil = false;
+      currentPhotoUrl = null;
+      photoPreview.classList.add("hidden");
+      photoPreview.src = "";
+      photoLabel.classList.remove("hidden");
       cardInput.focus();
     });
   }
@@ -323,6 +340,15 @@
     selectedBox.innerHTML = "";
     currentMarketPrice = null;
     currentFoil = false;
+    // only clear a photo that came from the now-abandoned selection — a
+    // manually uploaded file should stay put even if the seller tweaks the
+    // card name text afterward
+    if (!photoInput.files[0]) {
+      currentPhotoUrl = null;
+      photoPreview.classList.add("hidden");
+      photoPreview.src = "";
+      photoLabel.classList.remove("hidden");
+    }
     searchTimer = setTimeout(runCardSearch, 400);
   });
 
@@ -347,7 +373,12 @@
     fd.append("description", document.getElementById("l-desc").value.trim());
     if (currentMarketPrice) fd.append("market_price", currentMarketPrice);
     fd.append("foil", currentFoil ? "1" : "0");
-    if (photoInput.files[0]) fd.append("photo", photoInput.files[0]);
+    if (photoInput.files[0]) {
+      fd.append("photo", photoInput.files[0]);
+    } else if (currentPhotoUrl) {
+      // no manual upload — fall back to the picked printing's own photo
+      fd.append("photo_url", currentPhotoUrl);
+    }
 
     try {
       await api("/api/listings", { method: "POST", body: fd, isForm: true });
@@ -362,6 +393,7 @@
       lastResults = [];
       currentMarketPrice = null;
       currentFoil = false;
+      currentPhotoUrl = null;
       document.querySelector('.tabs button[data-tab="posts"]').click();
       loadMine();
     } catch (err) {
