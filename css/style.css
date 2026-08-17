@@ -458,14 +458,6 @@ input:focus, textarea:focus, select:focus {
 }
 .photo-drop img { max-width: 100%; max-height: 220px; border-radius: 4px; }
 
-.photo-drop-note {
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  color: var(--walnut);
-  opacity: 0.8;
-  margin: 6px 0 0;
-}
-
 .price-suggest {
   font-family: var(--font-mono);
   font-size: 0.8rem;
@@ -476,123 +468,6 @@ input:focus, textarea:focus, select:focus {
   margin-top: 8px;
 }
 .price-suggest strong { color: var(--sign-red); }
-
-/* ---------- Card search picker (grouped by set, 4-wide, load more) ---------- */
-.card-picker {
-  border: 2px solid var(--line);
-  border-radius: 6px;
-  background: #f8f4e6;
-  padding: 14px;
-  margin-top: 8px;
-  max-height: 480px;
-  overflow-y: auto;
-}
-.card-picker__empty {
-  font-family: var(--font-mono);
-  font-size: 0.78rem;
-  color: var(--walnut);
-  opacity: 0.8;
-  margin: 4px 0;
-}
-.card-picker__set-group { margin-bottom: 18px; }
-.card-picker__set-group:last-child { margin-bottom: 0; }
-.card-picker__set-heading {
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--walnut);
-  border-bottom: 1px solid var(--line);
-  padding-bottom: 4px;
-  margin-bottom: 10px;
-}
-.card-picker__grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
-}
-@media (max-width: 640px) {
-  .card-picker__grid { grid-template-columns: repeat(2, 1fr); }
-}
-.card-picker__item {
-  background: #fffdf7;
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  padding: 6px;
-  cursor: pointer;
-  text-align: center;
-  font-family: var(--font-mono);
-  position: relative;
-  transition: transform 0.1s ease, box-shadow 0.1s ease;
-}
-.card-picker__item:hover,
-.card-picker__item:focus {
-  transform: translateY(-2px);
-  box-shadow: 0 5px 12px rgba(0,0,0,0.25);
-  outline: none;
-}
-.card-picker__item img {
-  width: 100%;
-  aspect-ratio: 5/7;
-  object-fit: cover;
-  border-radius: 3px;
-  display: block;
-  margin-bottom: 5px;
-}
-.card-picker__item-name {
-  font-size: 0.68rem;
-  line-height: 1.2;
-}
-.card-picker__item-price {
-  font-size: 0.68rem;
-  color: var(--sign-red);
-  font-weight: 600;
-  margin-top: 2px;
-}
-.card-picker__item-price--none { color: var(--walnut); opacity: 0.6; font-weight: 400; }
-.card-picker__foil-chip {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  background: var(--mustard);
-  color: var(--ink);
-  font-size: 0.55rem;
-  padding: 1px 5px;
-  border-radius: 8px;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-  z-index: 1;
-}
-.card-picker__more-wrap { text-align: center; margin-top: 14px; }
-
-.selected-card {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background: #f4f0e2;
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  padding: 8px 10px;
-  margin-top: 8px;
-  font-family: var(--font-mono);
-  font-size: 0.76rem;
-}
-.selected-card img { width: 34px; border-radius: 2px; flex-shrink: 0; }
-.selected-card button { margin-left: auto; flex-shrink: 0; }
-
-.foil-badge {
-  display: inline-block;
-  background: linear-gradient(120deg, #d8b4e2, #a9d6e5, #f5e6a8);
-  color: var(--ink);
-  font-family: var(--font-mono);
-  font-size: 0.62rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-  padding: 2px 7px;
-  border-radius: 2px;
-  margin-left: 6px;
-}
 
 .mini-list { list-style: none; padding: 0; margin: 0; }
 .mini-list li {
