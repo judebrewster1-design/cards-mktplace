@@ -78,12 +78,12 @@
         </div>
 
         <div>
-          <label>Face-forward photo (for condition check)</label>
+          <label>Photo (optional)</label>
           <div class="photo-drop" id="photo-drop">
             <span id="photo-drop-label">Tap to choose a photo</span>
             <img id="photo-preview" class="hidden" />
           </div>
-          <input type="file" id="l-photo" accept="image/*" class="hidden" required />
+          <input type="file" id="l-photo" accept="image/*" class="hidden" />
         </div>
       </div>
 
@@ -337,7 +337,6 @@
     e.preventDefault();
     const errorEl = document.getElementById("l-error");
     errorEl.textContent = "";
-    if (!photoInput.files[0]) { errorEl.textContent = "A face-forward photo is required for condition verification."; return; }
 
     const fd = new FormData();
     fd.append("card_name", document.getElementById("l-card").value.trim());
@@ -348,7 +347,7 @@
     fd.append("description", document.getElementById("l-desc").value.trim());
     if (currentMarketPrice) fd.append("market_price", currentMarketPrice);
     fd.append("foil", currentFoil ? "1" : "0");
-    fd.append("photo", photoInput.files[0]);
+    if (photoInput.files[0]) fd.append("photo", photoInput.files[0]);
 
     try {
       await api("/api/listings", { method: "POST", body: fd, isForm: true });
