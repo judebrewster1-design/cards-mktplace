@@ -45,11 +45,18 @@
         <div>
           <label for="l-card">Card name</label>
           <input id="l-card" required placeholder="Start typing… e.g. Lightning Bolt" autocomplete="off" />
+
+          <label for="l-set-filter">Limit search to a set (optional)</label>
+          <div style="position:relative;">
+            <input id="l-set-filter" placeholder="e.g. Dominaria Remastered" autocomplete="off" />
+            <div class="set-suggestions hidden" id="l-set-filter-suggestions"></div>
+          </div>
+
           <div class="card-picker hidden" id="card-picker"></div>
           <div class="selected-card hidden" id="selected-card"></div>
 
-          <label for="l-set">Set (optional)</label>
-          <input id="l-set" placeholder="e.g. Dominaria Remastered" />
+          <label for="l-set">Set</label>
+          <input id="l-set" placeholder="Auto-filled once you pick a card above" />
 
           <label for="l-condition">Condition</label>
           <select id="l-condition">
@@ -171,6 +178,54 @@
   const pickerBox = document.getElementById("card-picker");
   const selectedBox = document.getElementById("selected-card");
 
+  // --- "limit search to a set" filter, with predictive text from the real Scryfall set list ---
+  const setFilterInput = document.getElementById("l-set-filter");
+  const setFilterSuggestBox = document.getElementById("l-set-filter-suggestions");
+  let allSets = [];
+
+  async function loadSetsList() {
+    try {
+      const data = await api("/api/sets");
+      allSets = data.sets || [];
+    } catch {
+      allSets = []; // predictive list just won't populate; typing a set name manually still filters
+    }
+  }
+  loadSetsList();
+
+  function renderSetFilterSuggestions(query) {
+    const q = query.trim().toLowerCase();
+    if (!q) { setFilterSuggestBox.classList.add("hidden"); return; }
+    const matches = allSets.filter((s) => s.name.toLowerCase().includes(q)).slice(0, 12);
+    if (!matches.length) {
+      setFilterSuggestBox.innerHTML = `<div class="set-suggestions__empty">No matching sets — you can still type a partial name.</div>`;
+      setFilterSuggestBox.classList.remove("hidden");
+      return;
+    }
+    setFilterSuggestBox.innerHTML = matches.map((s) => `
+      <div class="set-suggestions__item" data-name="${escapeHtml(s.name)}">${escapeHtml(s.name)}</div>
+    `).join("");
+    setFilterSuggestBox.classList.remove("hidden");
+    setFilterSuggestBox.querySelectorAll(".set-suggestions__item").forEach((el) => {
+      el.addEventListener("click", () => {
+        setFilterInput.value = el.dataset.name;
+        setFilterSuggestBox.classList.add("hidden");
+        runCardSearch();
+      });
+    });
+  }
+
+  setFilterInput.addEventListener("input", (e) => {
+    renderSetFilterSuggestions(e.target.value);
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(runCardSearch, 400);
+  });
+  setFilterInput.addEventListener("focus", (e) => { if (e.target.value.trim()) renderSetFilterSuggestions(e.target.value); });
+  setFilterInput.addEventListener("keydown", (e) => { if (e.key === "Enter") { setFilterSuggestBox.classList.add("hidden"); runCardSearch(); } });
+  document.addEventListener("click", (e) => {
+    if (!setFilterSuggestBox.contains(e.target) && e.target !== setFilterInput) setFilterSuggestBox.classList.add("hidden");
+  });
+
   function groupBySet(printings) {
     const groups = new Map();
     for (const p of printings) {
@@ -245,6 +300,22 @@
     });
   }
 
+  async function runCardSearch() {
+    const q = cardInput.value.trim();
+    if (q.length < 3) { pickerBox.classList.add("hidden"); pickerBox.innerHTML = ""; lastResults = []; return; }
+    const params = new URLSearchParams({ q });
+    const setFilter = setFilterInput.value.trim();
+    if (setFilter) params.set("set", setFilter);
+    try {
+      const data = await api("/api/card-search?" + params.toString());
+      lastResults = data.printings || [];
+      visibleSetCount = SETS_PER_PAGE;
+      renderPicker();
+    } catch {
+      pickerBox.classList.add("hidden");
+    }
+  }
+
   cardInput.addEventListener("input", (e) => {
     clearTimeout(searchTimer);
     // typing again after a selection means they're picking something new
@@ -252,19 +323,7 @@
     selectedBox.innerHTML = "";
     currentMarketPrice = null;
     currentFoil = false;
-
-    const q = e.target.value.trim();
-    if (q.length < 3) { pickerBox.classList.add("hidden"); pickerBox.innerHTML = ""; lastResults = []; return; }
-    searchTimer = setTimeout(async () => {
-      try {
-        const data = await api("/api/card-search?q=" + encodeURIComponent(q));
-        lastResults = data.printings || [];
-        visibleSetCount = SETS_PER_PAGE;
-        renderPicker();
-      } catch {
-        pickerBox.classList.add("hidden");
-      }
-    }, 400);
+    searchTimer = setTimeout(runCardSearch, 400);
   });
 
   // hide the picker if clicking elsewhere on the page
