@@ -70,7 +70,7 @@
     const tagClass = priceTagClass(l.price, l.market_price);
     return `
       <a class="card-pin" style="--tilt:${tilt}deg" href="listing.html?id=${l.id}">
-        <img src="${l.photo_url || 'https://placehold.co/300x420?text=No+Photo'}" alt="${escapeHtml(l.card_name)} photo" />
+        <img src="${l.photo_url || 'https://placehold.co/300x420?text=No+Photo'}" alt="${escapeHtml(l.card_name)} photo" onerror="this.onerror=null;this.src='https://placehold.co/300x420?text=No+Photo';" />
         <div class="card-pin__name">${escapeHtml(l.card_name)}</div>
         <div class="card-pin__set">${escapeHtml(l.set_name || "unknown set")} • ${escapeHtml(l.location || "PEI")}</div>
         <span class="price-tag ${tagClass}">$${Number(l.price).toFixed(2)}</span>
