@@ -199,7 +199,7 @@
                  data-name="${escapeHtml(p.name)}" data-price="${p.usd ?? ""}" data-foil="${p.foil ? "1" : "0"}"
                  data-image="${escapeHtml(p.image || "")}">
               ${p.foil ? `<span class="card-picker__foil-chip">Foil</span>` : ""}
-              <img src="${p.image || 'https://placehold.co/150x210?text=No+Image'}" alt="${escapeHtml(p.name)}" loading="lazy" />
+              <img src="${p.image || 'https://placehold.co/150x210?text=No+Image'}" alt="${escapeHtml(p.name)}" loading="lazy" onerror="this.onerror=null;this.src='https://placehold.co/150x210?text=No+Image';" />
               <div class="card-picker__item-name">${escapeHtml(p.name)}</div>
               <div class="card-picker__item-price ${p.usd ? "" : "card-picker__item-price--none"}">${p.usd ? "$" + Number(p.usd).toFixed(2) + " CAD" : "no price"}</div>
             </div>
@@ -230,7 +230,7 @@
     pickerBox.innerHTML = "";
     selectedBox.classList.remove("hidden");
     selectedBox.innerHTML = `
-      <img src="${data.image || 'https://placehold.co/60x84?text=No+Image'}" alt="" />
+      <img src="${data.image || 'https://placehold.co/60x84?text=No+Image'}" alt="" onerror="this.onerror=null;this.src='https://placehold.co/60x84?text=No+Image';" />
       <span>${escapeHtml(data.name)}${data.foil === "1" ? ` <span class="foil-badge">Foil</span>` : ""} — ${escapeHtml(data.set)}
         <br>${currentMarketPrice ? "market ref: $" + currentMarketPrice.toFixed(2) + " CAD" : "no market price found"}
       </span>
