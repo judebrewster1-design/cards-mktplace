@@ -34,6 +34,11 @@
       <label for="f-location">Location</label>
       <input id="f-location" placeholder="e.g. Charlottetown" />
     </div>
+    <div class="field" style="position:relative;">
+      <label for="f-set">Set</label>
+      <input id="f-set" placeholder="e.g. Dominaria Remastered" autocomplete="off" />
+      <div class="set-suggestions hidden" id="f-set-suggestions"></div>
+    </div>
     <div class="field" style="max-width:180px;">
       <label for="f-sort">Sort by</label>
       <select id="f-sort">
@@ -57,6 +62,9 @@
 <script src="js/api.js"></script>
 <script>
   const grid = document.getElementById("listing-grid");
+  const setInput = document.getElementById("f-set");
+  const setSuggestBox = document.getElementById("f-set-suggestions");
+  let allSets = [];       // full {name, code}[] from /api/sets, fetched once
 
   function priceTagClass(price, marketPrice) {
     if (!marketPrice) return "";
@@ -71,7 +79,7 @@
     return `
       <a class="card-pin" style="--tilt:${tilt}deg" href="listing.html?id=${l.id}">
         <img src="${l.photo_url || 'https://placehold.co/300x420?text=No+Photo'}" alt="${escapeHtml(l.card_name)} photo" onerror="this.onerror=null;this.src='https://placehold.co/300x420?text=No+Photo';" />
-        <div class="card-pin__name">${escapeHtml(l.card_name)}</div>
+        <div class="card-pin__name">${escapeHtml(l.card_name)}${l.foil ? `<span class="foil-badge">Foil</span>` : ""}</div>
         <div class="card-pin__set">${escapeHtml(l.set_name || "unknown set")} • ${escapeHtml(l.location || "PEI")}</div>
         <span class="price-tag ${tagClass}">$${Number(l.price).toFixed(2)}</span>
         ${l.market_price ? `<span class="market-ref">market ref: $${Number(l.market_price).toFixed(2)}</span>` : ""}
@@ -84,9 +92,11 @@
     const params = new URLSearchParams();
     const q = document.getElementById("f-search").value.trim();
     const loc = document.getElementById("f-location").value.trim();
+    const set = setInput.value.trim();
     const sort = document.getElementById("f-sort").value;
     if (q) params.set("q", q);
     if (loc) params.set("location", loc);
+    if (set) params.set("set", set);
     if (sort) params.set("sort", sort);
 
     grid.innerHTML = `<p style="color:var(--paper-dim); font-family: var(--font-mono);">Loading listings…</p>`;
@@ -102,9 +112,53 @@
     }
   }
 
+  // ---- Set filter: predictive text sourced from Scryfall's real set list ----
+  async function loadSetsList() {
+    try {
+      const data = await api("/api/sets");
+      allSets = data.sets || [];
+    } catch {
+      allSets = []; // autocomplete just won't suggest anything; typing + Filter still works
+    }
+  }
+
+  function renderSetSuggestions(query) {
+    const q = query.trim().toLowerCase();
+    if (!q) { setSuggestBox.classList.add("hidden"); return; }
+    const matches = allSets.filter((s) => s.name.toLowerCase().includes(q)).slice(0, 12);
+    if (!matches.length) {
+      setSuggestBox.innerHTML = `<div class="set-suggestions__empty">No matching sets — you can still type a partial name and filter.</div>`;
+      setSuggestBox.classList.remove("hidden");
+      return;
+    }
+    setSuggestBox.innerHTML = matches.map((s) => `
+      <div class="set-suggestions__item" data-name="${escapeHtml(s.name)}">${escapeHtml(s.name)}</div>
+    `).join("");
+    setSuggestBox.classList.remove("hidden");
+    setSuggestBox.querySelectorAll(".set-suggestions__item").forEach((el) => {
+      el.addEventListener("click", () => {
+        setInput.value = el.dataset.name;
+        setSuggestBox.classList.add("hidden");
+        load();
+      });
+    });
+  }
+
+  setInput.addEventListener("input", (e) => {
+    renderSetSuggestions(e.target.value);
+  });
+  setInput.addEventListener("focus", (e) => { if (e.target.value.trim()) renderSetSuggestions(e.target.value); });
+  document.addEventListener("click", (e) => {
+    if (!setSuggestBox.contains(e.target) && e.target !== setInput) setSuggestBox.classList.add("hidden");
+  });
+  setInput.addEventListener("keydown", (e) => { if (e.key === "Enter") { setSuggestBox.classList.add("hidden"); load(); } });
+
   document.getElementById("f-apply").addEventListener("click", load);
   document.getElementById("f-search").addEventListener("keydown", (e) => e.key === "Enter" && load());
+  loadSetsList();
   load();
 </script>
+</body>
+</html>
 </body>
 </html>
