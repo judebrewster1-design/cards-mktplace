@@ -34,10 +34,11 @@
       <label for="f-location">Location</label>
       <input id="f-location" placeholder="e.g. Charlottetown" />
     </div>
-    <div class="field" style="position:relative;">
+    <div class="field">
       <label for="f-set">Set</label>
-      <input id="f-set" placeholder="e.g. Dominaria Remastered" autocomplete="off" />
-      <div class="set-suggestions hidden" id="f-set-suggestions"></div>
+      <select id="f-set">
+        <option value="">All sets</option>
+      </select>
     </div>
     <div class="field" style="max-width:180px;">
       <label for="f-sort">Sort by</label>
@@ -62,9 +63,7 @@
 <script src="js/api.js"></script>
 <script>
   const grid = document.getElementById("listing-grid");
-  const setInput = document.getElementById("f-set");
-  const setSuggestBox = document.getElementById("f-set-suggestions");
-  let allSets = [];       // full {name, code}[] from /api/sets, fetched once
+  const setSelect = document.getElementById("f-set");
 
   function priceTagClass(price, marketPrice) {
     if (!marketPrice) return "";
@@ -92,7 +91,7 @@
     const params = new URLSearchParams();
     const q = document.getElementById("f-search").value.trim();
     const loc = document.getElementById("f-location").value.trim();
-    const set = setInput.value.trim();
+    const set = setSelect.value;
     const sort = document.getElementById("f-sort").value;
     if (q) params.set("q", q);
     if (loc) params.set("location", loc);
@@ -112,46 +111,20 @@
     }
   }
 
-  // ---- Set filter: predictive text sourced from Scryfall's real set list ----
+  // ---- Set filter: real dropdown, alphabetical, sourced from Scryfall's set list ----
   async function loadSetsList() {
     try {
       const data = await api("/api/sets");
-      allSets = data.sets || [];
+      const sets = data.sets || []; // already alphabetically sorted by the backend
+      setSelect.innerHTML =
+        `<option value="">All sets</option>` +
+        sets.map((s) => `<option value="${escapeHtml(s.name)}">${escapeHtml(s.name)}</option>`).join("");
     } catch {
-      allSets = []; // autocomplete just won't suggest anything; typing + Filter still works
+      // dropdown just stays at "All sets" if the set list couldn't be fetched
     }
   }
 
-  function renderSetSuggestions(query) {
-    const q = query.trim().toLowerCase();
-    if (!q) { setSuggestBox.classList.add("hidden"); return; }
-    const matches = allSets.filter((s) => s.name.toLowerCase().includes(q)).slice(0, 12);
-    if (!matches.length) {
-      setSuggestBox.innerHTML = `<div class="set-suggestions__empty">No matching sets — you can still type a partial name and filter.</div>`;
-      setSuggestBox.classList.remove("hidden");
-      return;
-    }
-    setSuggestBox.innerHTML = matches.map((s) => `
-      <div class="set-suggestions__item" data-name="${escapeHtml(s.name)}">${escapeHtml(s.name)}</div>
-    `).join("");
-    setSuggestBox.classList.remove("hidden");
-    setSuggestBox.querySelectorAll(".set-suggestions__item").forEach((el) => {
-      el.addEventListener("click", () => {
-        setInput.value = el.dataset.name;
-        setSuggestBox.classList.add("hidden");
-        load();
-      });
-    });
-  }
-
-  setInput.addEventListener("input", (e) => {
-    renderSetSuggestions(e.target.value);
-  });
-  setInput.addEventListener("focus", (e) => { if (e.target.value.trim()) renderSetSuggestions(e.target.value); });
-  document.addEventListener("click", (e) => {
-    if (!setSuggestBox.contains(e.target) && e.target !== setInput) setSuggestBox.classList.add("hidden");
-  });
-  setInput.addEventListener("keydown", (e) => { if (e.key === "Enter") { setSuggestBox.classList.add("hidden"); load(); } });
+  setSelect.addEventListener("change", load);
 
   document.getElementById("f-apply").addEventListener("click", load);
   document.getElementById("f-search").addEventListener("keydown", (e) => e.key === "Enter" && load());
