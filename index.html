@@ -1,0 +1,1451 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0c0d0f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Bullion Desk</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=Manrope:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: a refinery desk at night — two stamped spot "ingots" up top, then a tabbed assay bench. Dark only. */
+:root{
+  --bg:#0c0d0f; --panel:#141519; --panel2:#1b1c21; --line:#2a2b31; --fg:#ede9e0; --muted:#8e8b84;
+  --gold:#e0ad45; --gold2:#f7dc92; --silver:#b9c1cb; --silver2:#e6eaef; --ink:#17140c;
+  --up:#4cc98f; --down:#ec6e62; --shadow:0 1px 0 rgba(255,255,255,.03) inset,0 18px 40px -24px rgba(0,0,0,.8);
+  --f-display:"Big Shoulders Display","Arial Narrow",Impact,sans-serif;
+  --f-body:"Manrope",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --r:14px;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;background:var(--bg)}
+body{color:var(--fg);font:14px/1.5 var(--f-body);-webkit-font-smoothing:antialiased;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-block:calc(20px + env(safe-area-inset-top,0px)) calc(48px + env(safe-area-inset-bottom,0px))}
+.wrap{max-width:1080px;margin:0 auto;display:grid;gap:18px}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.label{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:600}
+
+/* top bar */
+.top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px}
+.brand{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.brand h1{margin:0;font:800 30px/1 var(--f-display);letter-spacing:.02em;text-transform:uppercase}
+.brand h1 span{background:linear-gradient(180deg,var(--gold2),var(--gold));-webkit-background-clip:text;background-clip:text;color:transparent}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.select,.chip,.btn{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:7px 12px;cursor:pointer}
+.select{appearance:none;padding-right:28px;background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);background-position:calc(100% - 15px) 52%,calc(100% - 10px) 52%;background-size:5px 5px;background-repeat:no-repeat}
+.adj{display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:5px 12px}
+.adj input{width:110px;accent-color:var(--gold)}
+.adj output{min-width:44px;text-align:right;font-size:12px}
+
+/* ingots */
+.ingots{display:grid;grid-template-columns:1fr 1fr minmax(220px,.7fr);gap:14px}
+.ingot{position:relative;overflow:hidden;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px 18px 12px;box-shadow:var(--shadow);display:grid;gap:6px;min-width:0}
+.ingot::before{content:"";position:absolute;inset:0 0 auto;height:3px;background:linear-gradient(90deg,transparent,var(--m2),var(--m1),transparent)}
+.ingot.g{--m1:var(--gold);--m2:var(--gold2)}
+.ingot.s{--m1:var(--silver);--m2:var(--silver2)}
+.ihead{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.stamp{font:600 11px var(--f-mono);border:1px solid var(--m1);color:var(--m1);border-radius:4px;padding:1px 6px;letter-spacing:.05em}
+.price{font:800 clamp(38px,6vw,54px)/1 var(--f-display);letter-spacing:.01em;background:linear-gradient(180deg,var(--m2),var(--m1));-webkit-background-clip:text;background-clip:text;color:transparent;transition:filter .3s}
+.price small{font-size:.38em;letter-spacing:.06em;margin-left:4px;-webkit-text-fill-color:var(--muted)}
+.flash-up .price{filter:drop-shadow(0 0 12px color-mix(in srgb,var(--up) 70%,transparent))}
+.flash-down .price{filter:drop-shadow(0 0 12px color-mix(in srgb,var(--down) 70%,transparent))}
+.sub{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px}
+.sub b{font-weight:500;color:var(--fg)}
+.delta{font:600 12px var(--f-mono);padding:2px 8px;border-radius:999px;background:var(--panel2)}
+.delta.up{color:var(--up)} .delta.down{color:var(--down)}
+.spark{width:100%;height:44px;display:block;margin-top:2px}
+.side{display:grid;gap:10px;align-content:start}
+.ratio{font:700 34px/1 var(--f-display)}
+.status{display:flex;align-items:center;gap:8px;font-size:12px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex:none}
+.dot.live{background:var(--up);animation:pulse 2s infinite}
+.dot.daily{background:var(--gold)} .dot.sample,.dot.stale{background:var(--down)}
+@keyframes pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--up) 60%,transparent)}100%{box-shadow:0 0 0 9px transparent}}
+.refresh{display:flex;align-items:center;gap:10px}
+.ring{position:relative;width:34px;height:34px;flex:none;border:0;background:none;padding:0;cursor:pointer;border-radius:50%}
+.ring svg{position:absolute;inset:0;transform:rotate(-90deg)}
+.ring circle{fill:none;stroke-width:3}
+.ring .bg{stroke:var(--line)} .ring .fg{stroke:var(--gold);stroke-linecap:round;stroke-dasharray:94.25;transition:stroke-dashoffset 1s linear}
+.ring span{position:absolute;inset:0;display:grid;place-items:center;font-size:15px;color:var(--fg)}
+.ring.spin span{animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* tabs */
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none}
+.tab{border:0;background:none;padding:10px 14px;cursor:pointer;color:var(--muted);font-weight:600;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap}
+.tab[aria-selected="true"]{color:var(--fg);border-color:var(--gold)}
+.tab .n{font:600 11px var(--f-mono);margin-left:6px;background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:0 6px}
+
+.bench{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:14px;align-items:start}
+.stackcol{display:grid;gap:14px;align-content:start}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:grid;gap:12px;min-width:0}
+.card h2{margin:0;font:700 20px/1.1 var(--f-display);letter-spacing:.03em;text-transform:uppercase}
+.card h3{margin:0;font:700 17px/1.1 var(--f-display);letter-spacing:.03em;text-transform:uppercase}
+.ghead{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.ghead p{margin:2px 0 0;font-size:12px;color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{padding:5px 11px;font-size:13px;font-weight:600}
+.chip small{font:500 11px var(--f-mono);color:var(--muted);margin-left:4px}
+.chip[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.chip[aria-pressed="true"] small{color:inherit;opacity:.7}
+
+.table{display:grid}
+.tr{display:grid;grid-template-columns:1.1fr 1fr 1.3fr;gap:10px;padding:9px 4px;border-bottom:1px dashed var(--line);align-items:baseline}
+.tr:last-child{border-bottom:0}
+.tr.th{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600;border-bottom:1px solid var(--line)}
+.tr > :nth-child(n+2){text-align:right}
+.tr .v{font-weight:600}
+.tr:not(.th):hover{background:var(--panel2)}
+.tr.hl .sz{color:var(--gold);font-weight:700}
+
+/* calculators */
+.field{display:grid;gap:6px}
+.inrow{display:flex;gap:8px}
+.input{flex:1;min-width:0;border:1px solid var(--line);background:var(--panel2);border-radius:10px;padding:10px 12px;font-family:var(--f-mono);font-size:16px}
+.input:focus{border-color:var(--gold);outline:none}
+select.input{font-family:var(--f-body);font-size:14px;flex:0 0 auto}
+.result{border-radius:12px;padding:14px;background:var(--panel2);border:1px solid var(--line);display:grid;gap:4px}
+.result .big{font:800 38px/1 var(--f-display);letter-spacing:.01em}
+.result .big.g{color:var(--gold)} .result .big.s{color:var(--silver)}
+.kv{display:flex;justify-content:space-between;gap:10px;font-size:13px}
+.btn{font-weight:600;text-align:center}
+.btn.primary{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.btn.big{padding:14px 16px;font-size:16px;border-radius:12px}
+.btn.warn{background:var(--gold);border-color:var(--gold);color:var(--ink)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn:not(:disabled):hover{border-color:var(--gold)}
+.note{font-size:12px;color:var(--muted);margin:0}
+
+/* coin builder */
+.coins{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:14px;align-items:start}
+.builder{gap:16px}
+.bstep{display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px}
+.bstep i{width:22px;height:22px;border-radius:50%;border:1px solid var(--gold);color:var(--gold);display:grid;place-items:center;font:600 12px var(--f-mono);font-style:normal;flex:none}
+.bstep{flex-wrap:wrap}
+.bstep em{font-style:normal;font-weight:500;color:var(--muted);font-size:12px;flex-basis:100%;padding-left:30px;margin-top:-4px}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:4px;background:var(--panel2);padding:4px;border-radius:12px;border:1px solid var(--line)}
+.seg button{border:0;background:none;padding:10px;border-radius:9px;font-weight:700;cursor:pointer;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
+.coinpick{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+.ctile{display:grid;justify-items:center;align-content:end;gap:6px;padding:10px 2px 8px;border:1px solid var(--line);border-radius:12px;background:var(--panel2);cursor:pointer;min-height:96px}
+.ctile .disc{width:var(--d);height:var(--d);border-radius:50%;display:grid;place-items:center;color:#1d2024;font:800 12px var(--f-display);letter-spacing:.02em;
+  background:radial-gradient(circle at 34% 28%,#f4f6f8 0,#c7cdd4 38%,#8c939c 78%,#6a7179 100%);box-shadow:inset 0 0 0 2px rgba(255,255,255,.28),inset 0 -3px 6px rgba(0,0,0,.28),0 2px 6px rgba(0,0,0,.4)}
+.ctile span{font-size:12px;font-weight:600;color:var(--muted);text-align:center;line-height:1.2}
+.ctile[aria-pressed="true"]{border-color:var(--gold);background:color-mix(in srgb,var(--gold) 10%,var(--panel2))}
+.ctile[aria-pressed="true"] span{color:var(--fg)}
+.yearrow{display:grid;grid-template-columns:minmax(0,130px) minmax(0,1fr);gap:10px;align-items:start}
+.yearrow .input{font-size:22px;letter-spacing:.06em;text-align:center;height:52px}
+.mintwrap{display:grid;gap:4px}
+.mintwrap .chip{min-width:44px}
+.info{border-radius:12px;padding:12px 14px;border:1px solid var(--line);background:var(--panel2);display:grid;gap:4px;font-size:13px;min-height:62px;align-content:center}
+.info b{font-size:14px}
+.info.ok{border-color:color-mix(in srgb,var(--silver) 45%,var(--line))}
+.info.none,.info.bad{border-color:color-mix(in srgb,var(--down) 45%,var(--line))}
+.info.none b,.info.bad b{color:var(--down)}
+.info.rare{border-color:var(--gold);background:color-mix(in srgb,var(--gold) 9%,var(--panel))}
+.info .ttl{font:700 22px/1.1 var(--f-display);text-transform:uppercase;letter-spacing:.03em;color:var(--gold)}
+.info p{margin:0}
+.info .var{border-left:2px solid var(--gold);padding-left:8px}
+.pill{justify-self:start;font:600 11px var(--f-mono);letter-spacing:.06em;padding:2px 8px;border-radius:999px;background:var(--silver);color:var(--ink)}
+.qtyrow{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.step{display:flex;align-items:center;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--panel2)}
+.step button{width:40px;height:44px;border:0;background:none;cursor:pointer;font-size:18px}
+.step button:hover{background:var(--line)}
+.step input{width:60px;border:0;background:none;text-align:center;font-family:var(--f-mono);font-size:18px;-moz-appearance:textfield;appearance:textfield}
+.step input::-webkit-outer-spin-button,.step input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.step.sm button{width:28px;height:28px;font-size:15px}
+.step.sm span{min-width:28px;text-align:center;font:600 13px var(--f-mono)}
+.toggle{display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;color:var(--muted)}
+.toggle input{accent-color:var(--gold);width:16px;height:16px}
+.recent{display:grid}
+.rrow{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px dashed var(--line);font-size:13px}
+.rrow:first-child{border-top:0}
+.rrow span{flex:1;min-width:0}
+.linkbtn{border:0;background:none;color:var(--gold);font-weight:700;cursor:pointer;padding:4px 6px}
+
+/* melt chart */
+details.card{gap:0}
+details.card summary{cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:10px}
+details.card summary::-webkit-details-marker{display:none}
+details.card summary::after{content:"+";font:600 20px var(--f-mono);color:var(--gold)}
+details.card[open] summary::after{content:"−"}
+details.card[open] summary{margin-bottom:14px}
+.groups{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:14px}
+.grp{border:1px solid var(--line);border-radius:12px;padding:12px;display:grid;gap:4px;background:var(--panel2)}
+.flag{font:700 11px var(--f-mono);padding:2px 7px;border-radius:4px;background:var(--panel);border:1px solid var(--line);white-space:nowrap}
+.crow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:7px 0;border-top:1px dashed var(--line)}
+.crow b{display:block;font-weight:700;font-size:13px}
+.crow small{display:block;color:var(--muted);font-size:12px;line-height:1.35}
+.cval{text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.cval div{font-weight:600}
+.cval small{font-size:11px}
+.tip{font-size:12px;color:var(--muted);border-left:2px solid var(--line);padding-left:8px;margin:4px 0 0}
+
+/* holdings */
+.hsum{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px}
+.hsum .big{font:800 34px/1 var(--f-display)}
+.split{height:8px;border-radius:99px;background:var(--panel2);overflow:hidden;display:flex}
+.split i{display:block;height:100%}
+.hrow{display:grid;grid-template-columns:10px minmax(0,1fr);gap:12px;padding:10px 0;border-top:1px dashed var(--line)}
+.hrow .sw{width:10px;height:10px;border-radius:3px;margin-top:5px}
+.hl{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.hl b{min-width:0}
+.hl2{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-top:4px}
+.hl2 small{color:var(--muted);font-size:12px;min-width:0}
+.hctl{display:flex;align-items:center;gap:6px;flex:none}
+.x{border:0;background:none;cursor:pointer;color:var(--muted);font-size:18px;padding:2px 8px;border-radius:8px}
+.x:hover{color:var(--down);background:var(--panel2)}
+.empty{text-align:center;padding:28px 12px;color:var(--muted);display:grid;gap:6px;justify-items:center}
+.empty b{font:700 20px var(--f-display);letter-spacing:.04em;text-transform:uppercase;color:var(--fg)}
+.steps{margin:0;padding-left:20px;display:grid;gap:6px;font-size:13px}
+.btnrow{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);opacity:0;background:var(--fg);color:var(--bg);padding:9px 16px;border-radius:999px;font-weight:600;font-size:13px;transition:.25s;pointer-events:none;z-index:9;max-width:calc(100% - 32px);text-align:center}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+footer{font-size:12px;color:var(--muted);display:flex;flex-wrap:wrap;gap:6px 16px;justify-content:space-between}
+
+html.compact body{padding-block:8px}
+html.compact .tabs,html.compact .panels,html.compact footer,html.compact .controls .adj{display:none!important}
+html.compact .brand h1{font-size:22px}
+
+@media (max-width:860px){
+  .ingots{grid-template-columns:1fr 1fr}
+  .side{grid-column:1/-1;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));align-items:center}
+  .bench,.coins{grid-template-columns:1fr}
+}
+@media (max-width:560px){
+  .ingots{grid-template-columns:1fr}
+  .tr{grid-template-columns:1fr .9fr 1.2fr;font-size:13px}
+  .btnrow{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="brand"><h1>Bullion <span>Desk</span></h1><span class="label">Spot · melt · junk silver</span></div>
+    <div class="controls">
+      <select class="select" id="cur" aria-label="Currency">
+        <option>USD</option><option>CAD</option><option>EUR</option><option>GBP</option><option>AUD</option><option>INR</option>
+      </select>
+      <label class="adj" title="Apply a dealer premium (+) or payout discount (−) to every price">
+        <span class="label">Adjust</span>
+        <input type="range" id="adj" min="-25" max="25" step="1" value="0">
+        <output id="adjOut" class="mono">melt</output>
+      </label>
+    </div>
+  </header>
+
+  <section class="ingots" aria-label="Spot prices">
+    <article class="ingot g" id="ingotG">
+      <div class="ihead"><span class="label">Gold · XAU</span><span class="stamp">.999</span></div>
+      <div class="price"><span data-o="g-oz">—</span><small>/ozt</small></div>
+      <div class="sub muted"><span>gram <b class="mono" data-o="g-g">—</b></span><span>kilo <b class="mono" data-o="g-kg">—</b></span><span class="delta" id="dG">—</span></div>
+      <svg class="spark" id="spG" viewBox="0 0 300 44" preserveAspectRatio="none" aria-hidden="true"></svg>
+    </article>
+    <article class="ingot s" id="ingotS">
+      <div class="ihead"><span class="label">Silver · XAG</span><span class="stamp">.999</span></div>
+      <div class="price"><span data-o="s-oz">—</span><small>/ozt</small></div>
+      <div class="sub muted"><span>gram <b class="mono" data-o="s-g">—</b></span><span>kilo <b class="mono" data-o="s-kg">—</b></span><span class="delta" id="dS">—</span></div>
+      <svg class="spark" id="spS" viewBox="0 0 300 44" preserveAspectRatio="none" aria-hidden="true"></svg>
+    </article>
+    <aside class="side">
+      <div class="card" style="padding:14px;gap:4px">
+        <span class="label">Gold / silver ratio</span>
+        <div class="ratio" id="ratio">—</div>
+        <span class="note" id="ratioNote">ounces of silver per ounce of gold</span>
+      </div>
+      <div class="card" style="padding:14px;gap:8px">
+        <div class="status"><span class="dot" id="dot"></span><span id="srcLabel">Connecting…</span></div>
+        <div class="refresh">
+          <button class="ring" id="ring" aria-label="Refresh prices now">
+            <svg viewBox="0 0 34 34"><circle class="bg" cx="17" cy="17" r="15"/><circle class="fg" id="ringFg" cx="17" cy="17" r="15"/></svg>
+            <span>↻</span>
+          </button>
+          <div style="font-size:12px"><div id="ago" class="muted">—</div><div id="nextIn" class="muted mono">—</div></div>
+        </div>
+        <div class="chips" id="speed" role="group" aria-label="Refresh speed">
+          <button class="chip" data-ms="10000">10s</button><button class="chip" data-ms="30000">30s</button><button class="chip" data-ms="60000">1 min</button>
+        </div>
+      </div>
+    </aside>
+  </section>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab" role="tab" data-tab="coins" aria-selected="true">Add coins</button>
+    <button class="tab" role="tab" data-tab="gold" aria-selected="false">Gold</button>
+    <button class="tab" role="tab" data-tab="silver" aria-selected="false">Silver bullion</button>
+    <button class="tab" role="tab" data-tab="hold" aria-selected="false">My stack<span class="n" id="holdN">0</span></button>
+  </nav>
+
+  <div class="panels">
+    <!-- COINS -->
+    <section data-panel="coins" class="coins">
+      <div class="card builder">
+        <div class="ghead"><div><h2>Add silver coins</h2><p>Four quick steps. Coins go straight into My stack.</p></div></div>
+
+        <div class="bstep"><i>1</i>Where is the coin from?</div>
+        <div class="seg" id="bCty" role="group" aria-label="Country">
+          <button type="button" data-v="US" aria-pressed="true">United States</button>
+          <button type="button" data-v="CA" aria-pressed="false">Canada</button>
+        </div>
+
+        <div class="bstep"><i>2</i>Which coin?</div>
+        <div class="coinpick" id="bDen" role="group" aria-label="Coin"></div>
+
+        <div class="bstep"><i>3</i>Year and mint mark <em>The mint mark is a small letter near the date or on the back. No letter? Pick None.</em></div>
+        <div class="yearrow">
+          <input class="input" id="bYear" type="text" inputmode="numeric" maxlength="4" placeholder="1964" aria-label="Year on the coin" autocomplete="off">
+          <div class="mintwrap"><span class="label">Mint mark</span><div class="chips" id="bMint" role="group" aria-label="Mint mark"></div></div>
+        </div>
+        <div class="info" id="bInfo" aria-live="polite"></div>
+
+        <div class="bstep"><i>4</i>How many?</div>
+        <div class="qtyrow">
+          <div class="step"><button type="button" id="bMinus" aria-label="One fewer">−</button><input id="bQty" type="number" inputmode="numeric" min="1" step="1" value="1" aria-label="How many"><button type="button" id="bPlus" aria-label="One more">+</button></div>
+          <div class="chips" id="bQuick"></div>
+        </div>
+
+        <button class="btn primary big" id="bAdd" type="button" disabled>Add coins</button>
+        <label class="toggle"><input type="checkbox" id="worn" checked> My coins are worn from circulation (1.2% less silver)</label>
+      </div>
+
+      <div class="stackcol">
+        <div class="card">
+          <div class="ghead"><h3>Just added</h3></div>
+          <div class="recent" id="recent"><p class="note">Coins you add show up here, with an undo button in case of a mistake.</p></div>
+        </div>
+
+        <div class="card">
+          <div class="ghead"><div><h3>Mixed bag? Add by face value</h3><p>For a pile of silver coins you don't want to sort by date. Dealers price junk silver this way.</p></div></div>
+          <select class="input" id="bagG" style="width:100%"></select>
+          <div class="inrow"><input class="input" id="bagF" type="number" inputmode="decimal" min="0" step="any" value="10" aria-label="Face value in dollars"><span class="muted" style="align-self:center">dollars face</span></div>
+          <div class="chips" id="bagPresets"></div>
+          <div class="result" style="grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px">
+            <div><span class="label">Melt value</span><div class="big s" id="bagV">—</div></div>
+            <div><span class="label">Pure silver</span><div class="mono" style="font-size:18px;font-weight:600" id="bagOz">—</div></div>
+          </div>
+          <button class="btn" id="bagAdd" type="button">Add bag to my stack</button>
+        </div>
+      </div>
+
+      <details class="card" style="grid-column:1/-1">
+        <summary><div><h3>Melt value of every silver coin</h3><p class="note">Reference chart with silver content and value per coin.</p></div></summary>
+        <div class="groups" id="groups"></div>
+      </details>
+    </section>
+
+    <!-- GOLD -->
+    <section data-panel="gold" class="bench" hidden>
+      <div class="card">
+        <div class="ghead"><div><h2>Gold by weight</h2><p>Pure-gold content times spot. Pick a karat.</p></div></div>
+        <div class="chips" id="karats"></div>
+        <div class="table" id="goldTable"></div>
+      </div>
+      <div class="card">
+        <h3>Gold calculator</h3>
+        <div class="field"><span class="label">Weight</span>
+          <div class="inrow">
+            <input class="input" id="gW" type="number" inputmode="decimal" min="0" step="any" value="1" aria-label="Gold weight">
+            <select class="input" id="gU" aria-label="Unit"></select>
+          </div>
+        </div>
+        <div class="field"><span class="label">Purity</span><select class="input" id="gK" style="width:100%" aria-label="Purity"></select></div>
+        <div class="result">
+          <span class="label">Value</span>
+          <div class="big g" id="gRes">—</div>
+          <div class="kv muted"><span>Pure gold</span><span class="mono" id="gPure">—</span></div>
+          <div class="kv muted"><span>Per gram of item</span><span class="mono" id="gPerG">—</span></div>
+        </div>
+        <button class="btn primary" id="gAdd" type="button">Add to my stack</button>
+        <p class="note">Jewelry tip: 10K, 14K and 18K are stamped 417, 585 and 750 inside the band.</p>
+      </div>
+    </section>
+
+    <!-- SILVER -->
+    <section data-panel="silver" class="bench" hidden>
+      <div class="card">
+        <div class="ghead"><div><h2>Silver by weight</h2><p>Bars, rounds, sterling and coin silver.</p></div></div>
+        <div class="chips" id="fines"></div>
+        <div class="table" id="silverTable"></div>
+      </div>
+      <div class="card">
+        <h3>Silver calculator</h3>
+        <div class="field"><span class="label">Weight</span>
+          <div class="inrow">
+            <input class="input" id="sW" type="number" inputmode="decimal" min="0" step="any" value="1" aria-label="Silver weight">
+            <select class="input" id="sU" aria-label="Unit"></select>
+          </div>
+        </div>
+        <div class="field"><span class="label">Purity</span><select class="input" id="sK" style="width:100%" aria-label="Purity"></select></div>
+        <div class="result">
+          <span class="label">Value</span>
+          <div class="big s" id="sRes">—</div>
+          <div class="kv muted"><span>Pure silver</span><span class="mono" id="sPure">—</span></div>
+          <div class="kv muted"><span>Per gram of item</span><span class="mono" id="sPerG">—</span></div>
+        </div>
+        <button class="btn primary" id="sAdd" type="button">Add to my stack</button>
+      </div>
+    </section>
+
+    <!-- HOLDINGS -->
+    <section data-panel="hold" class="bench" hidden>
+      <div class="stackcol">
+        <div class="card">
+          <div class="hsum">
+            <div><span class="label">Stack value</span><div class="big" id="hTot">—</div></div>
+            <div><span class="label">Today</span><div class="mono" style="font-size:18px;font-weight:600" id="hD">—</div><small class="muted mono" id="hDp"></small></div>
+            <div><span class="label">Gold</span><div class="mono" style="font-size:18px;font-weight:600;color:var(--gold)" id="hG">—</div><small class="muted mono" id="hGoz"></small></div>
+            <div><span class="label">Silver</span><div class="mono" style="font-size:18px;font-weight:600;color:var(--silver)" id="hS">—</div><small class="muted mono" id="hSoz"></small></div>
+          </div>
+          <div class="split"><i id="splitG" style="background:var(--gold);width:0"></i><i id="splitS" style="background:var(--silver);width:0"></i></div>
+        </div>
+        <div class="card">
+          <div class="ghead"><h3>Items</h3><button class="btn" id="hClear" type="button" hidden>Clear all</button></div>
+          <div id="hList"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="ghead"><div><h3>iPhone widget</h3><p>Stack value, today's move in dollars and percent, and spot prices on your home screen. Tap it to open a mini app where you can add coins and bullion right on your phone.</p></div><span class="flag">iOS</span></div>
+        <ol class="steps">
+          <li>Install <b>Scriptable</b> from the App Store. It's free.</li>
+          <li>Tap <b>Copy widget script</b>. In Scriptable, tap <b>+</b>, paste, name it Bullion Desk, and tap Done.</li>
+          <li>Long-press your home screen, tap <b>Edit</b>, then <b>Add Widget</b>, and pick <b>Scriptable</b>. Add it, long-press it, tap <b>Edit Widget</b>, and set Script to Bullion Desk.</li>
+          <li>Tap the widget any time to manage your stack on your phone.</li>
+        </ol>
+        <button class="btn primary big" id="wCopy" type="button">Copy widget script</button>
+        <div class="field" style="gap:8px">
+          <span class="label">Moved things around on this page?</span>
+          <p class="note">Tap <b>Copy stack</b>, open the widget's mini app, and tap <b>Import from website</b>.</p>
+          <button class="btn" id="wCopyStack" type="button">Copy stack</button>
+        </div>
+        <p class="note">iOS refreshes the widget about every 5–15 minutes. A ticking "updated" clock on the widget shows how fresh the numbers are.</p>
+      </div>
+      <p class="note" style="grid-column:1/-1">Your stack stays in this browser only. Nothing is sent anywhere.</p>
+    </section>
+  </div>
+
+  <footer>
+    <span>Live spot: gold-api.com · Fallback &amp; FX: fawazahmed0/exchange-api (daily)</span>
+    <span>Melt values are metal content only. Collector premiums are not included.</span>
+  </footer>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script type="text/plain" id="widgetSrc">
+// Bullion Desk · iPhone widget + mini app for Scriptable (free on the App Store)
+// Widget: stack value, today's move ($ and %), gold & silver spot.
+// Tap the widget to open the mini app: add coins and bullion, change amounts, switch currency,
+// or import your stack from the Bullion Desk website.
+
+const SEED = __SEED__;
+const SEED_CUR = "__CUR__";
+
+const OZ = 31.1034768;
+const WEAR = 0.715 / 0.7234;
+const C = {
+  bg: new Color("#0c0d0f"), panel: new Color("#16171b"), line: new Color("#2a2b31"),
+  gold: new Color("#e0ad45"), silver: new Color("#c9d0d8"), fg: new Color("#f1ede4"),
+  muted: new Color("#8e8b84"), up: new Color("#4cc98f"), down: new Color("#ec6e62"),
+};
+
+// ---------- storage ----------
+const fm = FileManager.local();
+const DIR = fm.documentsDirectory();
+const STACK = fm.joinPath(DIR, "bullion-desk-stack.json");
+const CACHE = fm.joinPath(DIR, "bullion-desk-cache.json");
+function readJSON(p, d) { try { return fm.fileExists(p) ? JSON.parse(fm.readString(p)) : d; } catch (e) { return d; } }
+function writeJSON(p, v) { try { fm.writeString(p, JSON.stringify(v)); } catch (e) {} }
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+const clean = it => ({ id: uid(), m: it.m === "XAU" ? "XAU" : "XAG", per: +it.per || 0, qty: Math.max(1, Math.round(+it.qty || 1)), lbl: String(it.lbl || "Item"), sub: String(it.sub || "") });
+
+let stack = readJSON(STACK, null);
+if (!stack) {
+  stack = { cur: SEED_CUR || "USD", items: (Array.isArray(SEED) ? SEED : []).map(clean) };
+  // Older setups used the widget Parameter, e.g. g=1.25;s=150;c=CAD
+  if (!stack.items.length && args.widgetParameter) {
+    for (const part of String(args.widgetParameter).split(/[;,&\s]+/)) {
+      const [k, v] = part.split("=").map(x => (x || "").trim());
+      if (/^g/i.test(k) && +v > 0) stack.items.push(clean({ m: "XAU", per: +v, lbl: "Gold", sub: "from widget parameter" }));
+      if (/^s/i.test(k) && +v > 0) stack.items.push(clean({ m: "XAG", per: +v, lbl: "Silver", sub: "from widget parameter" }));
+      if (/^c/i.test(k) && /^[a-z]{3}$/i.test(v)) stack.cur = v.toUpperCase();
+    }
+  }
+  writeJSON(STACK, stack);
+}
+const saveStack = () => writeJSON(STACK, stack);
+const itemOz = it => (it.per || 0) * (it.qty || 1);
+
+// ---------- prices ----------
+async function getJSON(url) { const r = new Request(url); r.timeoutInterval = 12; return await r.loadJSON(); }
+async function daily() {
+  for (const u of ["https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.min.json",
+                   "https://latest.currency-api.pages.dev/v1/currencies/usd.min.json"]) {
+    try { const j = await getJSON(u); if (j && j.usd && j.usd.xau) return j; } catch (e) {}
+  }
+  return null;
+}
+async function spot(sym) {
+  const j = await getJSON("https://api.gold-api.com/price/" + sym);
+  if (!(j && j.price > 0)) throw new Error("bad price");
+  return j.price;
+}
+async function loadPrices() {
+  const cache = readJSON(CACHE, {});
+  const [ref, g, s] = await Promise.all([daily(), spot("XAU").catch(() => null), spot("XAG").catch(() => null)]);
+  const P = { gold: g, silver: s, source: "Live" };
+  if (!(g && s)) {
+    if (ref) { P.gold = 1 / ref.usd.xau; P.silver = 1 / ref.usd.xag; P.source = "Daily"; }
+    else { P.gold = cache.gold; P.silver = cache.silver; P.source = "Offline"; }
+  }
+  P.base = ref ? { gold: 1 / ref.usd.xau, silver: 1 / ref.usd.xag } : cache.base; // today's opening reference
+  P.fx = ref ? ref.usd : (cache.fx || {});
+  if (P.source === "Live") writeJSON(CACHE, { gold: P.gold, silver: P.silver, base: P.base, fx: P.fx });
+  return P;
+}
+function summary(P) {
+  let CUR = stack.cur || "USD";
+  let rate = CUR === "USD" ? 1 : P.fx[CUR.toLowerCase()];
+  if (!rate) { CUR = "USD"; rate = 1; }
+  let g = 0, s = 0;
+  for (const it of stack.items) { if (it.m === "XAU") g += itemOz(it); else s += itemOz(it); }
+  const value = (pg, ps) => (g * pg + s * ps) * rate;
+  const total = P.gold ? value(P.gold, P.silver) : null;
+  const has = P.source !== "Daily" && P.base && P.gold;
+  const baseTotal = has ? value(P.base.gold, P.base.silver) : 0;
+  const chg = has && baseTotal ? total - baseTotal : null;
+  return {
+    CUR, rate, g, s, total, chg,
+    pct: chg != null ? chg / baseTotal * 100 : null,
+    gPct: has ? (P.gold / P.base.gold - 1) * 100 : null,
+    sPct: has ? (P.silver / P.base.silver - 1) * 100 : null,
+  };
+}
+
+// ---------- formatting ----------
+function money(v, CUR, dp) {
+  if (v == null || !isFinite(v)) return "—";
+  const d = dp != null ? dp : (Math.abs(v) >= 10000 ? 0 : 2);
+  try { return new Intl.NumberFormat("en-US", { style: "currency", currency: CUR, minimumFractionDigits: d, maximumFractionDigits: d }).format(v); }
+  catch (e) { return CUR + " " + v.toFixed(d); }
+}
+const pctStr = p => p == null ? "" : (p >= 0 ? "▲ " : "▼ ") + Math.abs(p).toFixed(2) + "%";
+const signed = (v, CUR) => (v >= 0 ? "+" : "−") + money(Math.abs(v), CUR);
+const ozStr = o => (o >= 100 ? o.toFixed(1) : o >= 1 ? o.toFixed(2) : o.toFixed(3)) + " oz";
+const itemName = it => (it.qty > 1 ? it.qty + " × " : "") + it.lbl;
+
+// ---------- widget ----------
+function txt(stack, s, font, color) {
+  const t = stack.addText(s); t.font = font; t.textColor = color; t.lineLimit = 1; t.minimumScaleFactor = 0.5; return t;
+}
+function addAge(stack, size, color) {
+  const d = stack.addDate(new Date()); d.applyRelativeStyle();
+  d.font = Font.systemFont(size); d.textColor = color; d.lineLimit = 1; d.minimumScaleFactor = 0.6; return d;
+}
+function buildWidget(P, fam) {
+  const S = summary(P);
+  const w = new ListWidget();
+  w.url = URLScheme.forRunningScript(); // tap opens the mini app
+  w.refreshAfterDate = new Date(Date.now() + 5 * 60 * 1000);
+
+  if (fam.startsWith("accessory")) {
+    if (fam === "accessoryInline") {
+      txt(w, `Stack ${money(S.total, S.CUR, 0)} ${pctStr(S.pct)}`, Font.mediumSystemFont(12), C.fg);
+    } else if (fam === "accessoryCircular") {
+      w.addAccessoryWidgetBackground = true;
+      txt(w, "STACK", Font.semiboldSystemFont(8), C.fg).centerAlignText();
+      txt(w, S.pct == null ? "—" : (S.pct >= 0 ? "+" : "−") + Math.abs(S.pct).toFixed(1) + "%", Font.boldRoundedSystemFont(13), C.fg).centerAlignText();
+    } else {
+      txt(w, "MY STACK", Font.semiboldSystemFont(10), C.fg);
+      txt(w, money(S.total, S.CUR), Font.boldRoundedSystemFont(20), C.fg);
+      if (S.chg != null) txt(w, `${signed(S.chg, S.CUR)}  ${pctStr(S.pct)}`, Font.mediumSystemFont(12), C.fg);
+      else txt(w, `Au ${money(P.gold * S.rate, S.CUR, 0)} · Ag ${money(P.silver * S.rate, S.CUR)}`, Font.systemFont(11), C.fg);
+    }
+    return w;
+  }
+
+  const bg = new LinearGradient();
+  bg.colors = [new Color("#1e1f25"), new Color("#0b0c0e")]; bg.locations = [0, 1];
+  bg.startPoint = new Point(0, 0); bg.endPoint = new Point(1, 1);
+  w.backgroundGradient = bg;
+  w.setPadding(14, 15, 12, 15);
+
+  const top = w.addStack(); top.layoutHorizontally(); top.topAlignContent();
+  const L = top.addStack(); L.layoutVertically();
+  const head = L.addStack(); head.centerAlignContent();
+  const bar = head.addStack(); bar.size = new Size(14, 3); bar.backgroundColor = C.gold; bar.cornerRadius = 1.5;
+  head.addSpacer(6);
+  txt(head, "MY STACK", Font.semiboldSystemFont(10), C.muted);
+  L.addSpacer(5);
+  txt(L, money(S.total, S.CUR), Font.boldRoundedSystemFont(fam === "small" ? 24 : 30), C.fg);
+  L.addSpacer(2);
+  if (S.chg != null) {
+    const col = S.chg >= 0 ? C.up : C.down;
+    txt(L, signed(S.chg, S.CUR), Font.semiboldRoundedSystemFont(14), col);
+    txt(L, pctStr(S.pct) + " today", Font.mediumSystemFont(11), col);
+  } else {
+    txt(L, stack.items.length ? "Today's change needs the live feed" : "Tap to add your stack", Font.systemFont(11), C.muted);
+  }
+
+  if (fam !== "small") {
+    top.addSpacer();
+    const R = top.addStack(); R.layoutVertically();
+    [["GOLD", P.gold * S.rate, S.gPct, C.gold], ["SILVER", P.silver * S.rate, S.sPct, C.silver]].forEach(([label, p, pc, col], i) => {
+      if (i) R.addSpacer(8);
+      const lr = R.addStack(); lr.addSpacer(); txt(lr, label, Font.semiboldSystemFont(9), col);
+      const pr = R.addStack(); pr.addSpacer(); txt(pr, money(p, S.CUR), Font.mediumMonospacedSystemFont(13), C.fg);
+      if (pc != null) { const cr = R.addStack(); cr.addSpacer(); txt(cr, pctStr(pc), Font.mediumSystemFont(10), pc >= 0 ? C.up : C.down); }
+    });
+  }
+
+  if (fam === "large") {
+    w.addSpacer(14);
+    const list = stack.items.slice(0, 5);
+    for (const it of list) {
+      const r = w.addStack(); r.centerAlignContent();
+      const dot = r.addStack(); dot.size = new Size(8, 8); dot.cornerRadius = 2; dot.backgroundColor = it.m === "XAU" ? C.gold : C.silver;
+      r.addSpacer(8); txt(r, itemName(it), Font.mediumSystemFont(12), C.fg);
+      r.addSpacer(); txt(r, money(itemOz(it) * (it.m === "XAU" ? P.gold : P.silver) * S.rate, S.CUR), Font.mediumMonospacedSystemFont(12), C.fg);
+      w.addSpacer(7);
+    }
+    if (stack.items.length > 5) txt(w, `+ ${stack.items.length - 5} more`, Font.systemFont(11), C.muted);
+  }
+
+  w.addSpacer();
+  const foot = w.addStack(); foot.centerAlignContent();
+  if (fam === "small") {
+    foot.layoutVertically();
+    txt(foot, `${ozStr(S.g)} Au · ${ozStr(S.s)} Ag`, Font.mediumMonospacedSystemFont(9), C.muted);
+    addAge(foot, 9, C.muted);
+  } else {
+    txt(foot, `${ozStr(S.g)} gold`, Font.mediumMonospacedSystemFont(10), C.gold);
+    foot.addSpacer(8);
+    txt(foot, `${ozStr(S.s)} silver`, Font.mediumMonospacedSystemFont(10), C.silver);
+    foot.addSpacer();
+    txt(foot, `${P.source} · `, Font.systemFont(9), C.muted);
+    addAge(foot, 9, C.muted);
+  }
+  return w;
+}
+
+// ---------- mini app ----------
+const COINS = {
+  US: [
+    ["Dime · 1964 and earlier", 0.07234, "US 90% silver"],
+    ["Quarter · 1964 and earlier", 0.18084, "US 90% silver"],
+    ["Half dollar · 1964 and earlier", 0.36169, "US 90% silver"],
+    ["Morgan or Peace dollar", 0.77344, "US 90% silver"],
+    ["Kennedy half · 1965–1970", 0.14792, "US 40% silver"],
+    ["Eisenhower dollar · S mint 1971–76", 0.3161, "US 40% silver"],
+    ["War nickel · 1942–1945", 0.05626, "US 35% silver"],
+  ],
+  CA: [
+    ["Dime · 1966 and earlier", 0.06, "Canada 80% silver"],
+    ["Quarter · 1966 and earlier", 0.15, "Canada 80% silver"],
+    ["50 cents · 1966 and earlier", 0.30, "Canada 80% silver"],
+    ["Dollar · 1935–1967", 0.60, "Canada 80% silver"],
+    ["Dime · 1968, not magnetic", 0.0375, "Canada 50% silver"],
+    ["Quarter · 1968, not magnetic", 0.09375, "Canada 50% silver"],
+  ],
+};
+const FACE = [
+  ["US 90% silver (1964 and earlier)", 0.715],
+  ["US 40% Kennedy halves", 0.29584 * WEAR],
+  ["Canada 80% silver (1966 and earlier)", 0.60 * WEAR],
+  ["Canada 50% silver (1968)", 0.375 * WEAR],
+];
+const GOLD_PRESETS = [["1 oz coin or bar", 1], ["1/2 oz coin", 0.5], ["1/4 oz coin", 0.25], ["1/10 oz coin", 0.1],
+  ["1 g bar", 1 / OZ], ["5 g bar", 5 / OZ], ["10 g bar", 10 / OZ], ["20 g bar", 20 / OZ], ["50 g bar", 50 / OZ], ["100 g bar", 100 / OZ], ["1 kg bar", 1000 / OZ]];
+const SILVER_PRESETS = [["1 oz coin or round", 1], ["2 oz", 2], ["5 oz", 5], ["10 oz bar", 10], ["100 oz bar", 100], ["1 kg bar", 1000 / OZ]];
+const UNITS = [["grams", 1], ["troy ounces", OZ], ["pennyweight", 1.55517384], ["kilograms", 1000]];
+const KARATS = [["24K · 999", 0.999], ["22K · 916", 0.9167], ["18K · 750", 0.75], ["14K · 585", 0.585], ["10K · 417", 0.417], ["9K · 375", 0.375]];
+const FINES = [[".999 fine", 0.999], [".925 sterling", 0.925], [".900 coin silver", 0.9], [".800 silver", 0.8], [".500 silver", 0.5]];
+const CURS = ["USD", "CAD", "EUR", "GBP", "AUD", "INR"];
+
+async function pick(title, message, options) {
+  const a = new Alert(); a.title = title; if (message) a.message = message;
+  options.forEach(o => a.addAction(o)); a.addCancelAction("Cancel");
+  return await a.presentSheet();
+}
+async function askNumber(title, message, placeholder, value, decimal) {
+  const a = new Alert(); a.title = title; a.message = message || "";
+  const f = a.addTextField(placeholder, value != null ? String(value) : "");
+  if (decimal) f.setDecimalPadKeyboard(); else f.setNumberPadKeyboard();
+  a.addAction("Done"); a.addCancelAction("Cancel");
+  if (await a.presentAlert() === -1) return null;
+  const n = parseFloat(a.textFieldValue(0).replace(",", "."));
+  return isFinite(n) && n > 0 ? n : null;
+}
+function addItem(it) {
+  const same = stack.items.find(x => x.lbl === it.lbl && x.m === it.m && Math.abs(x.per - it.per) < 1e-9);
+  if (same) same.qty += it.qty; else stack.items.unshift({ id: uid(), ...it });
+  saveStack();
+}
+
+async function addCoins() {
+  const c = await pick("Add silver coins", "Where are they from?", ["United States", "Canada", "Mixed bag, by face value"]);
+  if (c === -1) return;
+  if (c === 2) {
+    const g = await pick("Which kind of silver?", null, FACE.map(f => f[0])); if (g === -1) return;
+    const face = await askNumber("Face value", "How many dollars of face value? Example: 10 for forty 90% quarters.", "10", null, true); if (!face) return;
+    stack.items.unshift({ id: uid(), m: "XAG", per: face * FACE[g][1], qty: 1, lbl: `$${face} face`, sub: FACE[g][0] });
+    saveStack(); return;
+  }
+  const key = c === 0 ? "US" : "CA";
+  const i = await pick("Which coin?", "Pick the date range that matches your coin.", COINS[key].map(x => x[0])); if (i === -1) return;
+  const [name, asw, sub] = COINS[key][i];
+  const q = await askNumber("How many?", name, "1", 1, false); if (!q) return;
+  addItem({ m: "XAG", per: asw * WEAR, qty: Math.round(q), lbl: `${key === "US" ? "US" : "Canadian"} ${name.split(" · ")[0].toLowerCase()}`, sub });
+}
+async function addBullion(metal) {
+  const gold = metal === "XAU";
+  const presets = gold ? GOLD_PRESETS : SILVER_PRESETS;
+  const i = await pick(gold ? "Add gold" : "Add silver", "Pick a size, or enter your own weight.", [...presets.map(p => p[0]), gold ? "Jewelry or other weight…" : "Sterling or other weight…"]);
+  if (i === -1) return;
+  if (i < presets.length) {
+    const q = await askNumber("How many?", presets[i][0], "1", 1, false); if (!q) return;
+    addItem({ m: metal, per: presets[i][1], qty: Math.round(q), lbl: `${presets[i][0]} ${gold ? "gold" : "silver"}`, sub: gold ? "pure gold" : "pure silver" });
+    return;
+  }
+  const wgt = await askNumber("Weight", "How much does it weigh?", "0.0", null, true); if (!wgt) return;
+  const u = await pick("Unit", null, UNITS.map(x => x[0])); if (u === -1) return;
+  const list = gold ? KARATS : FINES;
+  const k = await pick("Purity", gold ? "Look for the stamp, like 14K or 585." : "Look for a stamp like 925 or STERLING.", list.map(x => x[0])); if (k === -1) return;
+  stack.items.unshift({ id: uid(), m: metal, per: wgt * UNITS[u][1] * list[k][1] / OZ, qty: 1,
+    lbl: `${wgt} ${UNITS[u][0]} ${gold ? "gold" : "silver"}`, sub: list[k][0] });
+  saveStack();
+}
+async function editItem(it, P, S) {
+  const val = money(itemOz(it) * (it.m === "XAU" ? P.gold : P.silver) * S.rate, S.CUR);
+  const i = await pick(itemName(it), `${ozStr(itemOz(it))} pure · ${val}`, ["Change how many", "Remove"]);
+  if (i === 0) {
+    const q = await askNumber("How many?", it.lbl, "1", it.qty, false); if (!q) return;
+    it.qty = Math.round(q); saveStack();
+  } else if (i === 1) {
+    const a = new Alert(); a.title = "Remove " + itemName(it) + "?"; a.addDestructiveAction("Remove"); a.addCancelAction("Cancel");
+    if (await a.presentAlert() === 0) { stack.items = stack.items.filter(x => x.id !== it.id); saveStack(); }
+  }
+}
+async function importFromWebsite() {
+  const raw = Pasteboard.pasteString() || "";
+  let data = null;
+  try { data = JSON.parse(raw.slice(raw.indexOf("{"))); } catch (e) {}
+  if (!data || !Array.isArray(data.items)) {
+    const a = new Alert(); a.title = "Nothing to import";
+    a.message = "On the Bullion Desk website, open My stack and tap Copy stack. Then come back here and tap Import again.";
+    a.addAction("OK"); await a.presentAlert(); return;
+  }
+  const i = await pick(`Import ${data.items.length} items`, "Replace what's here, or add them to it?", ["Replace my widget stack", "Add to my widget stack"]);
+  if (i === -1) return;
+  const items = data.items.map(clean);
+  stack.items = i === 0 ? items : [...items, ...stack.items];
+  if (data.cur) stack.cur = data.cur;
+  saveStack();
+}
+
+async function app(P) {
+  const table = new UITable();
+  table.showSeparators = true;
+  const run = fn => async () => { await fn(); render(); };
+  function row(title, subtitle, opts = {}) {
+    const r = new UITableRow();
+    r.backgroundColor = opts.bg || C.bg; r.dismissOnSelect = false; r.height = opts.height || 58;
+    const c = r.addText(title, subtitle);
+    c.titleColor = opts.color || C.fg; c.subtitleColor = opts.subColor || C.muted;
+    c.titleFont = opts.font || Font.semiboldSystemFont(16); c.subtitleFont = Font.systemFont(13);
+    c.widthWeight = 70;
+    if (opts.right != null) {
+      const v = r.addText(opts.right, opts.rightSub || null);
+      v.rightAligned(); v.widthWeight = 30; v.titleColor = opts.rightColor || C.fg; v.subtitleColor = opts.rightSubColor || C.muted;
+      v.titleFont = Font.mediumMonospacedSystemFont(15); v.subtitleFont = Font.systemFont(12);
+    }
+    if (opts.onSelect) r.onSelect = opts.onSelect;
+    table.addRow(r); return r;
+  }
+  function header(t) {
+    const r = new UITableRow(); r.isHeader = true; r.backgroundColor = C.bg; r.height = 40;
+    const c = r.addText(t); c.titleColor = C.muted; c.titleFont = Font.semiboldSystemFont(12);
+    table.addRow(r);
+  }
+  function render() {
+    table.removeAllRows();
+    const S = summary(P);
+    row(money(S.total, S.CUR), S.chg != null ? `${signed(S.chg, S.CUR)}  ${pctStr(S.pct)} today` : `${P.source} prices`, {
+      height: 92, bg: C.panel, font: Font.boldRoundedSystemFont(34),
+      subColor: S.chg == null ? C.muted : (S.chg >= 0 ? C.up : C.down),
+      right: `${ozStr(S.g)} Au`, rightSub: `${ozStr(S.s)} Ag`, rightColor: C.gold, rightSubColor: C.silver,
+    });
+    row("Gold", pctStr(S.gPct) || "spot", { color: C.gold, right: money(P.gold * S.rate, S.CUR), rightSub: "per troy oz" });
+    row("Silver", pctStr(S.sPct) || "spot", { color: C.silver, right: money(P.silver * S.rate, S.CUR), rightSub: "per troy oz" });
+
+    header("ADD TO YOUR STACK");
+    row("＋  Silver coins", "US and Canadian junk silver", { onSelect: run(addCoins) });
+    row("＋  Gold", "Coins, bars, jewelry", { onSelect: run(() => addBullion("XAU")) });
+    row("＋  Silver bullion", "Rounds, bars, sterling", { onSelect: run(() => addBullion("XAG")) });
+
+    header(stack.items.length ? `YOUR STACK · ${stack.items.length} ITEMS · TAP TO EDIT` : "YOUR STACK");
+    if (!stack.items.length) row("Nothing here yet", "Add coins or bullion above, or import from the website below.", { height: 64 });
+    for (const it of stack.items) {
+      const px = it.m === "XAU" ? P.gold : P.silver;
+      row(itemName(it), `${it.sub ? it.sub + " · " : ""}${ozStr(itemOz(it))} pure`, {
+        color: it.m === "XAU" ? C.gold : C.fg,
+        right: money(itemOz(it) * px * S.rate, S.CUR),
+        onSelect: run(() => editItem(it, P, S)),
+      });
+    }
+
+    header("SETTINGS");
+    row("Currency", "Tap to change", { right: S.CUR, onSelect: run(async () => {
+      const i = await pick("Currency", null, CURS); if (i !== -1) { stack.cur = CURS[i]; saveStack(); }
+    }) });
+    row("Import from website", "Paste the stack you copied on Bullion Desk", { onSelect: run(importFromWebsite) });
+    row("Preview widget", "See it the way your home screen will", { onSelect: async () => { await buildWidget(P, "medium").presentMedium(); } });
+    row("The widget updates on its next refresh", "iOS refreshes it about every 5–15 minutes.", { height: 64, color: C.muted });
+    table.reload();
+  }
+  render();
+  await table.present();
+}
+
+// ---------- run ----------
+const P = await loadPrices();
+if (config.runsInWidget) Script.setWidget(buildWidget(P, config.widgetFamily || "medium"));
+else await app(P);
+Script.complete();
+</script>
+
+<script>
+(() => {
+const OZ = 31.1034768;
+const SAMPLE = { XAU: 4000, XAG: 48 }; // only used if every price feed is unreachable
+const DAILY_MS = 600000;
+
+/* ---------- reference data ---------- */
+const UNITS = [
+  { k:'g', n:'grams', g:1 }, { k:'ozt', n:'troy oz', g:OZ }, { k:'dwt', n:'pennyweight', g:1.55517384 },
+  { k:'tola', n:'tola', g:11.6638 }, { k:'kg', n:'kilograms', g:1000 },
+];
+const KARATS = [
+  { k:'24K', f:.999, s:'999' }, { k:'22K', f:.9167, s:'916' }, { k:'18K', f:.750, s:'750' },
+  { k:'14K', f:.585, s:'585' }, { k:'10K', f:.417, s:'417' }, { k:'9K', f:.375, s:'375' },
+];
+const FINES = [
+  { k:'Fine', f:.999, s:'.999' }, { k:'Sterling', f:.925, s:'.925' }, { k:'Coin', f:.900, s:'.900' },
+  { k:'Canadian', f:.800, s:'.800' }, { k:'Half', f:.500, s:'.500' },
+];
+const GOLD_SIZES = [
+  ['1 g',1],['2.5 g',2.5],['1/10 oz',OZ/10],['5 g',5],['1/4 oz',OZ/4],['10 g',10],['1 tola',11.6638],
+  ['1/2 oz',OZ/2],['20 g',20],['1 oz',OZ,1],['50 g',50],['100 g',100],['10 oz',OZ*10],['1 kg',1000,1],
+];
+const SILVER_SIZES = [
+  ['1 g',1],['10 g',10],['1/4 oz',OZ/4],['1/2 oz',OZ/2],['1 oz',OZ,1],['2 oz',OZ*2],['5 oz',OZ*5],
+  ['10 oz',OZ*10,1],['1 kg',1000,1],['100 oz',OZ*100],
+];
+const GROUPS = [
+  { id:'us90', c:'US', name:'US 90% silver', yrs:'1964 and earlier', fine:'.900', cur:'usd', per1:.7234,
+    tip:'Look at the edge: solid silver, no copper stripe.',
+    coins:[
+      { id:'us90d', n:'Dime', d:'Roosevelt, Mercury, Barber', face:.10, asw:.07234 },
+      { id:'us90q', n:'Quarter', d:'Washington, Standing Liberty, Barber', face:.25, asw:.18084 },
+      { id:'us90h', n:'Half dollar', d:'1964 Kennedy, Franklin, Walking Liberty', face:.50, asw:.36169 },
+      { id:'us90o', n:'Silver dollar', d:'Morgan, Peace', face:1.00, asw:.77344 },
+    ]},
+  { id:'us40', c:'US', name:'US 40% silver', yrs:'1965–1976', fine:'.400', cur:'usd', per1:.29584,
+    tip:'Clad 40% halves show a faint grey-silver edge, not bright copper.',
+    coins:[
+      { id:'us40h', n:'Kennedy half', d:'1965–1970, and 1976-S silver', face:.50, asw:.14792 },
+      { id:'us40q', n:'Bicentennial quarter', d:'1976-S silver sets', face:.25, asw:.07395 },
+      { id:'us40e', n:'Eisenhower dollar', d:'1971–1976-S silver only', face:1.00, asw:.31610 },
+    ]},
+  { id:'us35', c:'US', name:'US 35% war nickels', yrs:'1942–1945', fine:'.350', cur:'usd', per1:1.1252,
+    tip:'Large mint mark (P, D or S) above Monticello on the back.',
+    coins:[ { id:'us35n', n:'Jefferson nickel', d:'Mid-1942 to 1945', face:.05, asw:.05626 } ]},
+  { id:'ca80', c:'CA', name:'Canada 80% silver', yrs:'1920–1966, some 1967', fine:'.800', cur:'cad', per1:.60,
+    tip:'Every Canadian dime, quarter, 50¢ and dollar dated 1966 or earlier is 80%.',
+    coins:[
+      { id:'ca80d', n:'Dime', d:'Bluenose schooner reverse', face:.10, asw:.0600 },
+      { id:'ca80q', n:'Quarter', d:'Caribou reverse', face:.25, asw:.1500 },
+      { id:'ca80h', n:'50 cents', d:'Coat of arms reverse', face:.50, asw:.3000 },
+      { id:'ca80o', n:'Silver dollar', d:'Voyageur canoe, 1935–1967', face:1.00, asw:.6000 },
+    ]},
+  { id:'ca50', c:'CA', name:'Canada 50% silver', yrs:'1968, some 1967', fine:'.500', cur:'cad', per1:.375,
+    tip:'1968 nickel versions stick to a magnet. The 50% silver ones do not.',
+    coins:[
+      { id:'ca50d', n:'Dime', d:'1967–1968, not magnetic', face:.10, asw:.0375 },
+      { id:'ca50q', n:'Quarter', d:'1967–1968, not magnetic', face:.25, asw:.09375 },
+    ]},
+  { id:'ca925', c:'CA', name:'Canada sterling', yrs:'1919 and earlier', fine:'.925', cur:'cad', per1:.6938,
+    tip:'Pre-1920 coins can be worth well above melt to collectors.',
+    coins:[
+      { id:'ca925n', n:'5 cents', d:'Tiny silver "fish scale"', face:.05, asw:.0347 },
+      { id:'ca925d', n:'Dime', d:'Victoria, Edward VII, George V', face:.10, asw:.0694 },
+      { id:'ca925q', n:'Quarter', d:'Victoria, Edward VII, George V', face:.25, asw:.1734 },
+      { id:'ca925h', n:'50 cents', d:'Victoria, Edward VII, George V', face:.50, asw:.3469 },
+    ]},
+];
+const WEAR = .715 / .7234;
+const COINS = Object.fromEntries(GROUPS.flatMap(g => g.coins.map(c => [c.id, { ...c, g }])));
+
+/* builder choices: coin size in px is roughly proportional to the real coin */
+const BDENS = {
+  US: [
+    { v:'5c',  n:'Nickel',  f:'5¢',  d:34, roll:40, one:'nickel', many:'nickels' },
+    { v:'10c', n:'Dime',    f:'10¢', d:28, roll:50, one:'dime', many:'dimes' },
+    { v:'25c', n:'Quarter', f:'25¢', d:38, roll:40, one:'quarter', many:'quarters' },
+    { v:'50c', n:'Half',    f:'50¢', d:46, roll:20, one:'half dollar', many:'half dollars' },
+    { v:'1',   n:'Dollar',  f:'$1',  d:52, roll:20, one:'silver dollar', many:'silver dollars' },
+  ],
+  CA: [
+    { v:'5c',  n:'5 cents', f:'5¢',  d:24, roll:40, one:'5-cent piece', many:'5-cent pieces' },
+    { v:'10c', n:'Dime',    f:'10¢', d:28, roll:50, one:'dime', many:'dimes' },
+    { v:'25c', n:'Quarter', f:'25¢', d:38, roll:40, one:'quarter', many:'quarters' },
+    { v:'50c', n:'50 cents',f:'50¢', d:46, roll:25, one:'50-cent piece', many:'50-cent pieces' },
+    { v:'1',   n:'Dollar',  f:'$1',  d:52, roll:25, one:'silver dollar', many:'silver dollars' },
+  ],
+};
+const MINTS = { US: [['','None'],['P','P'],['D','D'],['S','S'],['O','O'],['CC','CC']], CA: [['','None'],['H','H']] };
+
+// [country, coin, year, mint, approx. retail in well-worn condition (USD), design, note, only-if variety]
+const KEYS = [
+  ['US','10c',1916,'D',1000,'Mercury dime','The key date of the whole series.'],
+  ['US','10c',1921,'',60,'Mercury dime','Low mintage year.'],
+  ['US','10c',1921,'D',90,'Mercury dime','Low mintage year.'],
+  ['US','10c',1942,'',500,'Mercury dime','Famous overdate variety.','the 2 is struck over a 1 in the date'],
+  ['US','10c',1942,'D',550,'Mercury dime','Famous overdate variety.','the 2 is struck over a 1 in the date'],
+  ['US','10c',1894,'S',100000,'Barber dime','Only 24 were struck.'],
+  ['US','10c',1895,'',70,'Barber dime','Low mintage year.'],
+  ['US','10c',1895,'O',450,'Barber dime','Key date of the series.'],
+  ['US','10c',1901,'S',80,'Barber dime','Scarce mint.'],
+  ['US','10c',1903,'S',100,'Barber dime','Scarce mint.'],
+  ['US','25c',1932,'D',100,'Washington quarter','Key date: only 436,800 struck.'],
+  ['US','25c',1932,'S',100,'Washington quarter','Key date: only 408,000 struck.'],
+  ['US','25c',1916,'',3000,'Standing Liberty quarter','First year, very low mintage.'],
+  ['US','25c',1918,'S',1300,'Standing Liberty quarter','Overdate variety.','the 8 is struck over a 7 in the date'],
+  ['US','25c',1921,'',150,'Standing Liberty quarter','Low mintage year.'],
+  ['US','25c',1923,'S',250,'Standing Liberty quarter','Key date.'],
+  ['US','25c',1927,'S',40,'Standing Liberty quarter','Scarce mint.'],
+  ['US','25c',1896,'S',600,'Barber quarter','Key date.'],
+  ['US','25c',1901,'S',8000,'Barber quarter','Rarest Barber quarter.'],
+  ['US','25c',1913,'S',2000,'Barber quarter','Key date.'],
+  ['US','50c',1916,'',50,'Walking Liberty half','First year of issue.'],
+  ['US','50c',1916,'S',120,'Walking Liberty half','First year, mint mark on the front.'],
+  ['US','50c',1921,'',150,'Walking Liberty half','Low mintage year.'],
+  ['US','50c',1921,'D',250,'Walking Liberty half','Key date of the series.'],
+  ['US','50c',1921,'S',50,'Walking Liberty half','Low mintage year.'],
+  ['US','50c',1938,'D',60,'Walking Liberty half','Low mintage year.'],
+  ['US','50c',1892,'O',300,'Barber half','Scarce first-year mint.'],
+  ['US','50c',1892,'S',250,'Barber half','Scarce first-year mint.'],
+  ['US','50c',1893,'S',150,'Barber half','Scarce.'],
+  ['US','50c',1896,'S',150,'Barber half','Scarce.'],
+  ['US','50c',1897,'O',200,'Barber half','Scarce.'],
+  ['US','50c',1897,'S',200,'Barber half','Scarce.'],
+  ['US','50c',1913,'',50,'Barber half','Low mintage year.'],
+  ['US','50c',1914,'',100,'Barber half','Low mintage year.'],
+  ['US','50c',1915,'',60,'Barber half','Low mintage year.'],
+  ['US','1',1889,'CC',800,'Morgan dollar','Key Carson City date.'],
+  ['US','1',1892,'S',60,'Morgan dollar','Scarce in circulated grades.'],
+  ['US','1',1893,'',150,'Morgan dollar','Low mintage year.'],
+  ['US','1',1893,'O',200,'Morgan dollar','Low mintage year.'],
+  ['US','1',1893,'S',3000,'Morgan dollar','The king of Morgan dollars.'],
+  ['US','1',1894,'',800,'Morgan dollar','Lowest regular-issue mintage.'],
+  ['US','1',1895,'',25000,'Morgan dollar','Struck as proofs only. Most claimed examples are altered or fake.'],
+  ['US','1',1895,'O',250,'Morgan dollar','Scarce.'],
+  ['US','1',1895,'S',400,'Morgan dollar','Scarce.'],
+  ['US','1',1901,'',50,'Morgan dollar','Scarce in circulated grades.'],
+  ['US','1',1903,'S',150,'Morgan dollar','Scarce.'],
+  ['US','1',1904,'S',50,'Morgan dollar','Scarce.'],
+  ['US','1',1921,'',100,'Peace dollar','First-year high-relief Peace dollar.','it is the Peace design (eagle on a rock, PEACE on the back), not a Morgan'],
+  ['US','1',1928,'',300,'Peace dollar','Lowest mintage Peace dollar.'],
+  ['US','1',1934,'S',60,'Peace dollar','Scarce.'],
+  ['CA','5c',1921,'',3000,'Silver 5 cents','Most of the mintage was melted.'],
+  ['CA','10c',1936,'',100000,'Dot dime','One of the great Canadian rarities.','there is a small raised dot below the date'],
+  ['CA','10c',1889,'',300,'Victoria dime','Key date.'],
+  ['CA','25c',1875,'H',400,'Victoria quarter','Key date.'],
+  ['CA','25c',1889,'',300,'Victoria quarter','Key date.'],
+  ['CA','25c',1921,'',100,'George V quarter','Most of the mintage was melted.'],
+  ['CA','25c',1936,'',60,'Dot quarter','Variety struck in 1937 with 1936 dies.','there is a small raised dot below the wreath bow on the back'],
+  ['CA','50c',1921,'',30000,'George V 50 cents','The "King of Canadian coins". Nearly all were melted.'],
+  ['CA','50c',1932,'',100,'George V 50 cents','Low mintage year.'],
+  ['CA','50c',1947,'',60,'Maple Leaf 50 cents','Variety.','there is a tiny maple leaf just after the date'],
+  ['CA','50c',1948,'',120,'George VI 50 cents','Key date: low mintage.'],
+  ['CA','1',1945,'',200,'Voyageur dollar','Low mintage year.'],
+  ['CA','1',1946,'',80,'Voyageur dollar','Low mintage year.'],
+  ['CA','1',1947,'',150,'Voyageur dollar','Low mintage year (blunt and pointed 7 varieties).'],
+  ['CA','1',1948,'',900,'Voyageur dollar','The key date of the series.'],
+  ['CA','1',1955,'',120,'Arnprior dollar','Variety.','there are only 1½ water lines to the right of the canoe'],
+];
+const DEN_WORD = { '5c':'nickels', '10c':'dimes', '25c':'quarters', '50c':'halves', '1':'dollars' };
+
+/* ---------- state ---------- */
+const store = {
+  get(k, d){ try { const v = localStorage.getItem('bd:'+k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v){ try { localStorage.setItem('bd:'+k, JSON.stringify(v)); } catch {} },
+};
+const S = {
+  px: { XAU:null, XAG:null }, open: { XAU:null, XAG:null }, base: null,
+  src: 'connecting', at: null, next: 0, period: 30000, loading: false, liveMs: store.get('liveMs', 30000),
+  fx: { usd:1, cad:1.37, eur:.92, gbp:.78, aud:1.52, inr:84 },
+  cur: store.get('cur','USD'), adj: store.get('adj',0),
+  karat: store.get('karat','24K'), fine: store.get('fine','Fine'), worn: store.get('worn', true),
+  hold: store.get('hold', []), hist: store.get('hist', []), recent: [],
+};
+// older saved items had no quantity: give them one
+S.hold = S.hold.filter(h => h && h.m).map(h => h.per ? h : { ...h, per: h.oz, qty: 1, lbl: h.label });
+const B = { cty: store.get('bCty','US'), den: '25c', year: '', mint: '', qty: 1 };
+
+/* ---------- helpers ---------- */
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const rate = () => S.fx[S.cur.toLowerCase()] || 1;
+const fmtCache = {};
+function money(usd, { raw=false, dp } = {}) {
+  if (usd == null || !isFinite(usd)) return '—';
+  const v = usd * rate() * (raw ? 1 : 1 + S.adj/100);
+  const d = dp ?? (Math.abs(v) >= 10000 ? 0 : 2);
+  const key = S.cur + d;
+  fmtCache[key] ??= new Intl.NumberFormat(undefined, { style:'currency', currency:S.cur, minimumFractionDigits:d, maximumFractionDigits:d });
+  return fmtCache[key].format(v);
+}
+const num = (v, d=4) => Number(v).toLocaleString(undefined, { maximumFractionDigits:d, minimumFractionDigits:Math.min(d,2) });
+const ozStr = oz => oz >= 1 ? num(oz,3)+' ozt' : num(oz*OZ,3)+' g';
+const perG = m => S.px[m] ? S.px[m] / OZ : null;
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+function toast(t){ const el=$('#toast'); el.textContent=t; el.classList.add('on'); clearTimeout(toast.t); toast.t=setTimeout(()=>el.classList.remove('on'),2200); }
+
+/* ---------- data feeds ---------- */
+async function getJSON(url){ const r = await fetch(url, { cache:'no-store' }); if(!r.ok) throw new Error(r.status); return r.json(); }
+async function liveSpot(sym){
+  const j = await getJSON('https://api.gold-api.com/price/'+sym);
+  if (!(j.price > 0)) throw new Error('bad price'); return j.price;
+}
+async function dailyUSD(date='latest'){
+  const urls = [`https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@${date}/v1/currencies/usd.min.json`,
+                `https://${date}.currency-api.pages.dev/v1/currencies/usd.min.json`];
+  for (const u of urls) { try { const j = await getJSON(u); if (j.usd) return j.usd; } catch {} }
+  throw new Error('daily feed down');
+}
+async function loadFx(){
+  try {
+    const d = await dailyUSD();
+    for (const k of Object.keys(S.fx)) if (d[k] > 0) S.fx[k] = d[k];
+    S.daily = d;
+    if (d.xau > 0 && d.xag > 0) S.base = { XAU: 1/d.xau, XAG: 1/d.xag }; // today's opening reference
+    renderAll();
+  } catch {}
+}
+async function refresh(){
+  if (S.loading) return; S.loading = true; $('#ring').classList.add('spin');
+  let g, s, src;
+  try { [g, s] = await Promise.all([liveSpot('XAU'), liveSpot('XAG')]); src = 'live'; }
+  catch {
+    try { const d = S.daily || await dailyUSD(); S.daily = d; g = 1/d.xau; s = 1/d.xag; src = 'daily'; }
+    catch { if (S.px.XAU) { src = 'stale'; } else { g = SAMPLE.XAU; s = SAMPLE.XAG; src = 'sample'; } }
+  }
+  if (g && s) setPrices(g, s);
+  S.src = src; S.period = src === 'live' ? S.liveMs : DAILY_MS; S.next = Date.now() + S.period;
+  S.loading = false; $('#ring').classList.remove('spin');
+  renderAll();
+}
+function setPrices(g, s){
+  const pg = S.px.XAU, ps = S.px.XAG;
+  S.px.XAU = g; S.px.XAG = s; S.at = Date.now();
+  S.open.XAU ??= g; S.open.XAG ??= s;
+  flash('#ingotG', pg, g); flash('#ingotS', ps, s);
+  const last = S.hist[S.hist.length-1];
+  if (!last || last.g !== g || last.s !== s || Date.now() - last.t > 60000) {
+    S.hist.push({ t: Date.now(), g, s }); if (S.hist.length > 240) S.hist = S.hist.slice(-240); store.set('hist', S.hist);
+  }
+}
+function flash(sel, prev, now){
+  if (prev == null || prev === now) return;
+  const el = $(sel); el.classList.remove('flash-up','flash-down'); void el.offsetWidth;
+  el.classList.add(now > prev ? 'flash-up' : 'flash-down'); setTimeout(()=>el.classList.remove('flash-up','flash-down'), 1400);
+}
+
+/* ---------- ticker ---------- */
+function spark(svg, key, colorVar){
+  const pts = S.hist.filter(h => h[key] > 0).slice(-120);
+  if (pts.length < 2) { svg.innerHTML = `<text x="150" y="27" text-anchor="middle" font-size="11" fill="var(--muted)" font-family="var(--f-body)">Trend builds as prices update</text>`; return; }
+  const vs = pts.map(p => p[key]); let lo = Math.min(...vs), hi = Math.max(...vs);
+  if (hi - lo < hi * 1e-5) { lo -= hi*1e-4; hi += hi*1e-4; }
+  const x = i => (i/(pts.length-1))*300, y = v => 40 - ((v-lo)/(hi-lo))*34;
+  const line = pts.map((p,i)=>`${i?'L':'M'}${x(i).toFixed(1)},${y(p[key]).toFixed(1)}`).join('');
+  const id = 'gr'+key;
+  svg.innerHTML = `<defs><linearGradient id="${id}" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="var(${colorVar})" stop-opacity=".28"/><stop offset="1" stop-color="var(${colorVar})" stop-opacity="0"/></linearGradient></defs>
+    <path d="${line}L300,44L0,44Z" fill="url(#${id})"/>
+    <path d="${line}" fill="none" stroke="var(${colorVar})" stroke-width="1.6" vector-effect="non-scaling-stroke"/>
+    <circle cx="${x(pts.length-1)}" cy="${y(vs[vs.length-1])}" r="2.6" fill="var(${colorVar})"/>`;
+}
+function delta(el, now, open, label){
+  if (!now || !open) { el.textContent = '—'; el.className = 'delta'; return; }
+  const p = (now/open - 1)*100;
+  el.textContent = (p >= 0 ? '▲ ' : '▼ ') + Math.abs(p).toFixed(2) + '% ' + label;
+  el.className = 'delta ' + (p > 0.0001 ? 'up' : p < -0.0001 ? 'down' : '');
+}
+function renderTicker(){
+  const { XAU:g, XAG:s } = S.px;
+  const set = (k, v) => $$(`[data-o="${k}"]`).forEach(e => e.textContent = v);
+  set('g-oz', money(g)); set('g-g', money(g && g/OZ)); set('g-kg', money(g && g/OZ*1000, { dp:0 }));
+  set('s-oz', money(s)); set('s-g', money(s && s/OZ, { dp:3 })); set('s-kg', money(s && s/OZ*1000, { dp:0 }));
+  const today = S.src === 'live' && S.base;
+  delta($('#dG'), g, today ? S.base.XAU : S.open.XAU, today ? 'today' : 'session');
+  delta($('#dS'), s, today ? S.base.XAG : S.open.XAG, today ? 'today' : 'session');
+  $('#ratio').textContent = g && s ? (g/s).toFixed(1) + ' : 1' : '—';
+  const r = g && s ? g/s : 0;
+  $('#ratioNote').textContent = !r ? 'ounces of silver per ounce of gold'
+    : r > 80 ? 'Silver is cheap relative to gold (above 80)' : r < 50 ? 'Gold is cheap relative to silver (below 50)' : 'Within the usual 50–80 range';
+  spark($('#spG'), 'g', '--gold'); spark($('#spS'), 's', '--silver');
+  $$('#speed .chip').forEach(b => b.setAttribute('aria-pressed', +b.dataset.ms === S.liveMs));
+  const every = S.liveMs >= 60000 ? S.liveMs/60000 + ' min' : S.liveMs/1000 + 's';
+  const labels = { live:`Live spot · updates every ${every}`, daily:'Daily reference price (live feed unreachable)',
+                   sample:'Sample prices · feeds unreachable', stale:'Showing last price · retrying', connecting:'Connecting…' };
+  $('#dot').className = 'dot ' + S.src; $('#srcLabel').textContent = labels[S.src];
+  $('#adjOut').textContent = S.adj ? (S.adj > 0 ? '+' : '') + S.adj + '%' : 'melt';
+}
+function tick(){
+  if (S.at) { const sec = Math.round((Date.now()-S.at)/1000); $('#ago').textContent = 'Updated ' + (sec < 5 ? 'just now' : sec < 90 ? sec+'s ago' : Math.round(sec/60)+' min ago'); }
+  const left = Math.max(0, S.next - Date.now());
+  $('#nextIn').textContent = S.next ? 'next in ' + (left > 60000 ? Math.ceil(left/60000)+' min' : Math.ceil(left/1000)+'s') : '';
+  $('#ringFg').style.strokeDashoffset = S.next ? (94.25 * (left / S.period)).toFixed(2) : 0;
+  if (S.next && left <= 0 && !document.hidden) refresh();
+}
+
+/* ---------- gold & silver tabs ---------- */
+function chips(host, list, cur, onPick){
+  host.innerHTML = list.map(o => `<button class="chip" type="button" data-k="${o.k}" aria-pressed="${o.k===cur}">${o.k}<small>${o.s}</small></button>`).join('');
+  host.onclick = e => { const b = e.target.closest('.chip'); if (b) onPick(b.dataset.k); };
+}
+function sizeTable(host, sizes, metal, f){
+  const pg = perG(metal);
+  host.innerHTML = `<div class="tr th"><span>Size</span><span>Pure</span><span>Price</span></div>` +
+    sizes.map(([l, g, hl]) => `<div class="tr${hl?' hl':''}"><span class="sz">${l}</span><span class="mono muted">${num(g*f, g*f < 10 ? 3 : 2)} g</span><span class="mono v">${money(pg && pg*g*f)}</span></div>`).join('');
+}
+function calc(pfx, metal, list){
+  const w = parseFloat($('#'+pfx+'W').value) || 0;
+  const u = UNITS.find(x => x.k === $('#'+pfx+'U').value) || UNITS[0];
+  const f = list[+$('#'+pfx+'K').value]?.f ?? 1;
+  const grams = w * u.g, pure = grams * f, pg = perG(metal);
+  $('#'+pfx+'Res').textContent = money(pg && pg*pure);
+  $('#'+pfx+'Pure').textContent = num(pure, 3) + ' g · ' + num(pure/OZ, 4) + ' ozt';
+  $('#'+pfx+'PerG').textContent = money(pg && pg*f, { dp: metal==='XAG' ? 3 : 2 });
+  return { grams, pure, f, w, u };
+}
+function renderGold(){
+  const k = KARATS.find(x => x.k === S.karat) || KARATS[0];
+  chips($('#karats'), KARATS, k.k, v => { S.karat = v; store.set('karat', v); renderGold(); });
+  sizeTable($('#goldTable'), GOLD_SIZES, 'XAU', k.f);
+  calc('g', 'XAU', KARATS);
+}
+function renderSilver(){
+  const k = FINES.find(x => x.k === S.fine) || FINES[0];
+  chips($('#fines'), FINES, k.k, v => { S.fine = v; store.set('fine', v); renderSilver(); });
+  sizeTable($('#silverTable'), SILVER_SIZES, 'XAG', k.f);
+  calc('s', 'XAG', FINES);
+}
+
+/* ---------- coins: which silver is it, and is it a collector coin? ---------- */
+const nativeRate = g => g.cur === 'cad' ? S.fx.cad : 1;
+const silverPx = () => S.px.XAG || SAMPLE.XAG;
+const coinMeltUSD = c => silverPx() * c.asw * (S.worn ? WEAR : 1);
+function resolveCoin(c, d, y, m){
+  const none = msg => ({ none: msg });
+  if (c === 'US') {
+    if (d === '5c') {
+      if (y >= 1943 && y <= 1945) return { id:'us35n' };
+      if (y === 1942) return (m === 'P' || m === 'S') ? { id:'us35n' } : none('Only 1942-P and 1942-S nickels, with the large mint mark above Monticello, contain silver.');
+      return none(`${y} US nickels are copper-nickel.`);
+    }
+    if (d === '1') {
+      if (y < 1878) return { id:'us90o', early:true };
+      if ((y <= 1904) || (y >= 1921 && y <= 1928) || (y >= 1934 && y <= 1935)) return { id:'us90o' };
+      if (y >= 1971 && y <= 1976 && y !== 1975 && m === 'S') return { id:'us40e', note:'Only S-mint collector Eisenhower dollars are 40% silver.' };
+      return none(`No US silver dollar was issued for ${y}${m ? '-' + m : ''}. Eisenhower dollars only have silver with an S mint mark.`);
+    }
+    const id = { '10c':'us90d', '25c':'us90q', '50c':'us90h' }[d];
+    if (y <= 1964) return { id, early: y < 1892 };
+    if (d === '50c' && y <= 1970) return { id:'us40h' };
+    if (y === 1976 && m === 'S' && d !== '10c') return { id: d === '25c' ? 'us40q' : 'us40h', note:'Only 1976-S coins from silver sets are 40%. Proof-set 1976-S coins are clad.' };
+    return none(`${y} US ${DEN_WORD[d]} are copper-nickel clad.`);
+  }
+  if (d === '1') {
+    if (y >= 1935 && y <= 1967) return { id:'ca80o' };
+    return none(y < 1935 ? 'Canada first issued circulating silver dollars in 1935.' : `Canadian dollars from ${y} are nickel.`);
+  }
+  if (d === '5c') return y <= 1921 ? { id:'ca925n', vic: y <= 1901 } : none(`Canadian 5-cent pieces from ${y} have no silver.`);
+  const ids = { '10c':['ca925d','ca80d','ca50d'], '25c':['ca925q','ca80q','ca50q'], '50c':['ca925h','ca80h',null] }[d];
+  if (y <= 1919) return { id: ids[0], vic: y <= 1901 };
+  if (y <= 1966) return { id: ids[1] };
+  if (y === 1967) return { id: ids[1], note: d === '50c' ? '' : '1967 coins can be 80% or 50% silver. Counted as 80%.' };
+  if (y === 1968 && ids[2]) return { id: ids[2], note:'Check with a magnet: 1968 coins that stick are nickel, not silver.' };
+  return none(`Canadian ${DEN_WORD[d]} from ${y} have no silver.`);
+}
+function collectorCheck(c, d, y, m, r){
+  const k = KEYS.find(k => k[0] === c && k[1] === d && k[2] === y && k[3] === m);
+  let hit = k && { design:k[5], value:k[4], note:k[6], vari:k[7] };
+  if (!hit && c === 'US' && d === '1' && m === 'CC') hit = { design:'Carson City Morgan dollar', value:150, note:'Every CC-mint Morgan dollar carries a collector premium.' };
+  if (!hit && r.early) hit = d === '1'
+    ? { design:'Seated Liberty or Trade dollar', value:300, note:'US silver dollars from before 1878 trade well above melt.' }
+    : { design:'Seated Liberty era silver', value:{ '10c':25, '25c':40, '50c':70 }[d], note:'US silver coins from before 1892 almost always sell above melt.' };
+  if (!hit && r.vic) hit = { design:'Victorian-era silver', value:{ '5c':15, '10c':15, '25c':30, '50c':80 }[d], note:'Canadian coins from Queen Victoria’s reign usually sell above melt.' };
+  if (!hit) return null;
+  const prem = hit.value - coinMeltUSD(COINS[r.id]);
+  return prem >= 20 ? { ...hit, prem } : null;
+}
+
+/* ---------- coin builder ---------- */
+const curDen = () => BDENS[B.cty].find(x => x.v === B.den) || BDENS[B.cty][2];
+function evalBuilder(){
+  const ys = String(B.year).trim();
+  if (ys.length < 4) return { state:'empty' };
+  const y = parseInt(ys, 10);
+  if (!y || y < 1790 || y > new Date().getFullYear()) return { state:'bad' };
+  const r = resolveCoin(B.cty, B.den, y, B.mint);
+  if (r.none) return { state:'none', msg:r.none };
+  const c = COINS[r.id], per = c.asw * (S.worn ? WEAR : 1);
+  const hit = collectorCheck(B.cty, B.den, y, B.mint, r);
+  return { state: hit ? 'rare' : 'ok', r, c, per, each: per * silverPx(), hit, y, tag: `${y}${B.mint ? '-' + B.mint : ''}` };
+}
+function renderBuilder(){
+  $$('#bCty button').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === B.cty));
+  $('#bDen').innerHTML = BDENS[B.cty].map(d => `
+    <button type="button" class="ctile" data-v="${d.v}" aria-pressed="${d.v === B.den}">
+      <div class="disc" style="--d:${d.d}px">${d.f}</div><span>${d.n}</span></button>`).join('');
+  if (!MINTS[B.cty].some(m => m[0] === B.mint)) B.mint = '';
+  $('#bMint').innerHTML = MINTS[B.cty].map(([v, l]) => `<button type="button" class="chip" data-v="${v}" aria-pressed="${v === B.mint}">${l}</button>`).join('');
+  const d = curDen();
+  $('#bQuick').innerHTML = [[1,'1'],[10,'10'],[d.roll,`Roll of ${d.roll}`]].map(([n,l]) => `<button type="button" class="chip" data-n="${n}" aria-pressed="${B.qty === n}">${l}</button>`).join('');
+  renderBuilderInfo();
+}
+function renderBuilderInfo(){
+  const e = evalBuilder(), d = curDen(), info = $('#bInfo'), btn = $('#bAdd');
+  let html = '';
+  btn.disabled = true; btn.classList.remove('warn'); btn.textContent = 'Add coins';
+  if (e.state === 'empty') html = `<b>Type the year on the coin</b><span class="muted">It tells you right away how much silver the coin has.</span>`;
+  else if (e.state === 'bad') html = `<b>Check the year</b><span>Enter the four-digit date on the coin, for example 1964.</span>`;
+  else if (e.state === 'none') html = `<b>No silver in this one</b><span>${esc(e.msg)}</span>`;
+  else if (e.state === 'ok') {
+    const pct = Math.round(parseFloat(e.c.g.fine) * 100);
+    html = `<span class="pill">${pct}% SILVER</span><b>${e.tag} ${e.c.n} · ${esc(e.c.g.name)}</b>
+      <span>${num(e.per, 4)} oz of pure silver · <b class="mono">${money(e.each)}</b> each</span>
+      ${e.r.note ? `<span class="muted">${esc(e.r.note)}</span>` : ''}`;
+    btn.disabled = false;
+    btn.textContent = `Add ${B.qty} ${B.qty === 1 ? d.one : d.many} · ${money(e.each * B.qty)}`;
+  } else {
+    const h = e.hit;
+    html = `<span class="label" style="color:var(--gold)">Possible collector coin</span>
+      <div class="ttl">${e.tag} ${esc(h.design)}</div>
+      <p>${esc(h.note)} Usually worth about <b>${money(h.value, { raw:true, dp:0 })}+</b> even well worn, roughly <b>${money(h.prem, { raw:true, dp:0 })} over its silver</b>.</p>
+      ${h.vari ? `<p class="var">Only if ${esc(h.vari)}. Otherwise it's ordinary silver.</p>` : ''}
+      <p class="note">Consider keeping it out of your junk pile and checking a price guide or coin dealer.</p>`;
+    btn.disabled = false; btn.classList.add('warn');
+    btn.textContent = `Add as junk silver anyway · ${money(e.each * B.qty)}`;
+  }
+  info.className = 'info ' + e.state; info.innerHTML = html;
+}
+function addFromBuilder(){
+  const e = evalBuilder(); if (e.state !== 'ok' && e.state !== 'rare') return;
+  const d = curDen(), q = B.qty;
+  const lbl = `${e.tag} ${B.cty === 'US' ? 'US' : 'Canadian'} ${d.one}`;
+  const id = addHold({ m:'XAG', per:e.per, qty:q, lbl, sub:e.c.g.name, key:`coin:${e.c.id}:${e.tag}` }, true);
+  S.recent.unshift({ id, q, text:`${q} × ${lbl}`, usd:e.each * q });
+  S.recent = S.recent.slice(0, 8);
+  toast(`Added ${q} ${q === 1 ? d.one : d.many} to your stack`);
+  B.qty = 1; $('#bQty').value = 1;
+  renderBuilder(); renderRecent();
+}
+function renderRecent(){
+  $('#recent').innerHTML = S.recent.length ? S.recent.map((r, i) => `
+    <div class="rrow"><span>${esc(r.text)} <span class="muted mono">· ${money(r.usd)}</span></span><button class="linkbtn" type="button" data-undo="${i}">Undo</button></div>`).join('')
+    : '<p class="note">Coins you add show up here, with an undo button in case of a mistake.</p>';
+}
+
+/* ---------- bag + chart ---------- */
+function buildChart(){
+  $('#groups').innerHTML = GROUPS.map(g => `
+    <div class="grp">
+      <div class="ghead"><div><h3>${g.name}</h3><p>${g.yrs}</p></div><span class="flag">${g.c==='US'?'USA':'CAN'} ${g.fine}</span></div>
+      ${g.coins.map(c => `<div class="crow" data-coin="${c.id}">
+          <div><b>${c.n}</b><small>${c.d} · ${num(c.asw,4)} oz</small></div>
+          <div class="cval"><div data-melt>—</div><small class="muted" data-x>—</small></div></div>`).join('')}
+      <p class="tip">${g.tip}</p>
+    </div>`).join('');
+  $('#bagG').innerHTML = GROUPS.map(g => `<option value="${g.id}">${g.name} · ${g.yrs}</option>`).join('');
+  $('#bagPresets').innerHTML = [1,5,10,20,100,1000].map(v => `<button class="chip" type="button" data-f="${v}">$${v.toLocaleString()}</button>`).join('');
+}
+function renderCoins(){
+  renderBuilderInfo();
+  for (const c of Object.values(COINS)) {
+    const row = document.querySelector(`[data-coin="${c.id}"]`); if (!row) continue;
+    const m = coinMeltUSD(c);
+    row.querySelector('[data-melt]').textContent = money(m);
+    row.querySelector('[data-x]').textContent = (m * nativeRate(c.g) / c.face).toFixed(1) + '× face';
+  }
+  const g = bagGroup(), face = parseFloat($('#bagF').value) || 0, oz = face * g.per1 * (S.worn ? WEAR : 1);
+  $('#bagV').textContent = money(oz * silverPx()); $('#bagOz').textContent = num(oz, 3) + ' ozt';
+  $$('#bagPresets .chip').forEach(b => b.setAttribute('aria-pressed', +b.dataset.f === face));
+  renderRecent();
+}
+const bagGroup = () => GROUPS.find(x => x.id === $('#bagG').value) || GROUPS[0];
+
+/* ---------- holdings ---------- */
+const hOz = h => h.per * h.qty;
+const hName = h => (h.qty > 1 ? `${h.qty} × ` : '') + h.lbl;
+function saveHold(){ store.set('hold', S.hold); }
+function addHold(item, quiet){
+  const same = item.key && S.hold.find(h => h.key === item.key);
+  if (same) { same.qty += item.qty; saveHold(); renderHold(); if (!quiet) toast('Added to your stack'); return same.id; }
+  const id = Date.now().toString(36) + Math.random().toString(36).slice(2,5);
+  S.hold.unshift({ id, ...item }); saveHold(); renderHold(); if (!quiet) toast('Added to your stack');
+  return id;
+}
+function renderHold(){
+  let ozG = 0, ozS = 0;
+  for (const h of S.hold) { if (h.m === 'XAU') ozG += hOz(h); else ozS += hOz(h); }
+  const valG = S.px.XAU ? ozG*S.px.XAU : 0, valS = S.px.XAG ? ozS*S.px.XAG : 0, tot = valG+valS;
+  $('#hTot').textContent = money(tot); $('#hG').textContent = money(valG); $('#hS').textContent = money(valS);
+  $('#hGoz').textContent = num(ozG,4)+' ozt pure'; $('#hSoz').textContent = num(ozS,3)+' ozt pure';
+  $('#splitG').style.width = tot ? (valG/tot*100)+'%' : 0; $('#splitS').style.width = tot ? (valS/tot*100)+'%' : 0;
+  if (S.src === 'live' && S.base && tot) {
+    const baseTot = ozG*S.base.XAU + ozS*S.base.XAG, d = tot - baseTot, p = d / baseTot * 100;
+    $('#hD').textContent = (d >= 0 ? '+' : '−') + money(Math.abs(d));
+    $('#hD').style.color = d >= 0 ? 'var(--up)' : 'var(--down)';
+    $('#hDp').textContent = (p >= 0 ? '▲ ' : '▼ ') + Math.abs(p).toFixed(2) + '%';
+  } else { $('#hD').textContent = '—'; $('#hD').style.color = ''; $('#hDp').textContent = tot ? 'needs live prices' : ''; }
+  $('#holdN').textContent = S.hold.length; $('#hClear').hidden = !S.hold.length;
+  $('#hList').innerHTML = S.hold.length ? S.hold.map(h => `
+    <div class="hrow"><span class="sw" style="background:var(${h.m==='XAU'?'--gold':'--silver'})"></span>
+      <div style="min-width:0">
+        <div class="hl"><b>${esc(hName(h))}</b><span class="mono" style="font-weight:600">${money(S.px[h.m] && hOz(h)*S.px[h.m])}</span></div>
+        <div class="hl2"><small>${h.sub ? esc(h.sub) + ' · ' : ''}${ozStr(hOz(h))} pure</small>
+          <div class="hctl"><div class="step sm"><button type="button" data-q="-1" data-id="${h.id}" aria-label="One fewer">−</button><span>${h.qty}</span><button type="button" data-q="1" data-id="${h.id}" aria-label="One more">+</button></div>
+          <button class="x" type="button" data-del="${h.id}" aria-label="Remove ${esc(h.lbl)}">×</button></div></div>
+      </div></div>`).join('')
+    : `<div class="empty"><b>Your stack is empty</b><span>Add coins on the Add coins tab, or bullion from the Gold and Silver tabs. Values here update with every price tick.</span></div>`;
+}
+
+/* ---------- widget export ---------- */
+function widgetData(){
+  return { v:1, cur:S.cur, items: S.hold.map(h => ({ m:h.m, per:+h.per.toFixed(6), qty:h.qty, lbl:h.lbl, sub:h.sub || '' })) };
+}
+function widgetScript(){
+  const data = widgetData();
+  return $('#widgetSrc').textContent.trim()
+    .replace('__SEED__', () => JSON.stringify(data.items))
+    .replace('__CUR__', () => S.cur);
+}
+function copyText(text, okMsg){
+  const fallback = () => {
+    const ta = document.createElement('textarea'); ta.value = text; ta.setAttribute('readonly', '');
+    ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0'; document.body.appendChild(ta); ta.select();
+    let ok = false; try { ok = document.execCommand('copy'); } catch {} ta.remove();
+    toast(ok ? okMsg : 'Copy was blocked. Open this page in Safari and try again.');
+  };
+  try { navigator.clipboard.writeText(text).then(() => toast(okMsg), fallback); } catch { fallback(); }
+}
+
+/* ---------- render all ---------- */
+function renderAll(){ renderTicker(); renderGold(); renderSilver(); renderCoins(); renderHold(); }
+
+/* ---------- wiring ---------- */
+function fillCalc(pfx, list){
+  $('#'+pfx+'U').innerHTML = UNITS.map(u => `<option value="${u.k}">${u.n}</option>`).join('');
+  $('#'+pfx+'K').innerHTML = list.map((k,i) => `<option value="${i}">${k.k} · ${k.s}</option>`).join('');
+  ['W','U','K'].forEach(x => $('#'+pfx+x).addEventListener('input', () => pfx==='g' ? renderGold() : renderSilver()));
+}
+fillCalc('g', KARATS); fillCalc('s', FINES);
+buildChart(); renderBuilder();
+
+$('#cur').value = S.cur;
+$('#cur').onchange = e => { S.cur = e.target.value; store.set('cur', S.cur); renderAll(); };
+$('#adj').value = S.adj;
+$('#adj').oninput = e => { S.adj = +e.target.value; store.set('adj', S.adj); renderAll(); };
+$('#ring').onclick = () => refresh();
+$('#speed').onclick = e => { const b = e.target.closest('[data-ms]'); if (!b) return;
+  S.liveMs = +b.dataset.ms; store.set('liveMs', S.liveMs);
+  if (S.src === 'live') { S.period = S.liveMs; S.next = Math.min(S.next, Date.now() + S.liveMs); }
+  renderTicker(); };
+$('#worn').checked = S.worn;
+$('#worn').onchange = e => { S.worn = e.target.checked; store.set('worn', S.worn); renderCoins(); };
+
+// builder
+$('#bCty').onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; B.cty = b.dataset.v; store.set('bCty', B.cty); renderBuilder(); };
+$('#bDen').onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; B.den = b.dataset.v; renderBuilder(); };
+$('#bMint').onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; B.mint = b.dataset.v;
+  $$('#bMint .chip').forEach(x => x.setAttribute('aria-pressed', x === b)); renderBuilderInfo(); };
+$('#bYear').addEventListener('input', e => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 4); B.year = e.target.value; renderBuilderInfo(); });
+$('#bYear').addEventListener('keydown', e => { if (e.key === 'Enter') addFromBuilder(); });
+const setQty = n => { B.qty = Math.max(1, Math.min(100000, Math.floor(n) || 1)); $('#bQty').value = B.qty;
+  $$('#bQuick .chip').forEach(x => x.setAttribute('aria-pressed', +x.dataset.n === B.qty)); renderBuilderInfo(); };
+$('#bMinus').onclick = () => setQty(B.qty - 1);
+$('#bPlus').onclick = () => setQty(B.qty + 1);
+$('#bQty').addEventListener('change', e => setQty(+e.target.value));
+$('#bQty').addEventListener('input', e => { if (+e.target.value >= 1) { B.qty = Math.floor(+e.target.value); renderBuilderInfo(); } });
+$('#bQuick').onclick = e => { const b = e.target.closest('[data-n]'); if (b) setQty(+b.dataset.n); };
+$('#bAdd').onclick = addFromBuilder;
+$('#recent').onclick = e => { const b = e.target.closest('[data-undo]'); if (!b) return;
+  const r = S.recent[+b.dataset.undo]; const h = S.hold.find(x => x.id === r.id);
+  if (h) { h.qty -= r.q; if (h.qty <= 0) S.hold = S.hold.filter(x => x !== h); saveHold(); renderHold(); }
+  S.recent.splice(+b.dataset.undo, 1); renderRecent(); toast('Removed'); };
+
+// bag
+$('#bagG').oninput = renderCoins; $('#bagF').oninput = renderCoins;
+$('#bagPresets').onclick = e => { const b = e.target.closest('[data-f]'); if (b) { $('#bagF').value = b.dataset.f; renderCoins(); } };
+$('#bagAdd').onclick = () => { const g = bagGroup(); const face = parseFloat($('#bagF').value) || 0; if (!face) { toast('Enter a face value first'); return; }
+  const oz = face * g.per1 * (S.worn ? WEAR : 1);
+  const id = addHold({ m:'XAG', per:oz, qty:1, lbl:`${g.cur === 'cad' ? 'C$' : '$'}${face} face · ${g.name}`, sub:g.yrs }, true);
+  S.recent.unshift({ id, q:1, text:`${g.cur === 'cad' ? 'C$' : '$'}${face} face of ${g.name}`, usd: oz * silverPx() }); S.recent = S.recent.slice(0, 8);
+  renderRecent(); toast('Bag added to your stack'); };
+
+// tabs
+function showTab(t){
+  $$('.tab').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === t));
+  $$('[data-panel]').forEach(p => p.hidden = p.dataset.panel !== t);
+  store.set('tab', t);
+}
+$$('.tab').forEach(b => b.onclick = () => showTab(b.dataset.tab));
+
+// gold / silver add
+$('#gAdd').onclick = () => { const r = calc('g','XAU',KARATS); if (!r.pure) return;
+  addHold({ m:'XAU', per:r.pure/OZ, qty:1, lbl:`${num(r.w,3)} ${r.u.n} gold`, sub:KARATS[+$('#gK').value].k }); };
+$('#sAdd').onclick = () => { const r = calc('s','XAG',FINES); if (!r.pure) return;
+  addHold({ m:'XAG', per:r.pure/OZ, qty:1, lbl:`${num(r.w,3)} ${r.u.n} silver`, sub:FINES[+$('#sK').value].s + ' fine' }); };
+
+// stack list
+$('#hList').onclick = e => {
+  const q = e.target.closest('[data-q]'), d = e.target.closest('[data-del]');
+  if (q) { const h = S.hold.find(x => x.id === q.dataset.id); if (!h) return;
+    h.qty = Math.max(1, h.qty + +q.dataset.q); saveHold(); renderHold(); }
+  if (d) { S.hold = S.hold.filter(h => h.id !== d.dataset.del); saveHold(); renderHold(); }
+};
+let clearArm = 0;
+$('#hClear').onclick = e => { if (Date.now() - clearArm < 3000) { S.hold = []; saveHold(); renderHold(); e.target.textContent='Clear all'; return; }
+  clearArm = Date.now(); e.target.textContent = 'Tap again to clear'; setTimeout(()=>e.target.textContent='Clear all', 3000); };
+$('#wCopy').onclick = () => copyText(widgetScript(), 'Widget script copied. Paste it into Scriptable.');
+$('#wCopyStack').onclick = () => copyText('BULLIONDESK ' + JSON.stringify(widgetData()), 'Stack copied. Open the widget app and tap Import from website.');
+
+if (location.hash === '#compact') document.documentElement.classList.add('compact');
+const tabHash = { '#gold':'gold', '#silver':'silver', '#junk':'coins', '#coins':'coins', '#stack':'hold' }[location.hash];
+showTab(tabHash || store.get('tab','coins'));
+document.addEventListener('visibilitychange', () => { if (!document.hidden && S.next && Date.now() > S.next) refresh(); });
+
+renderAll();
+loadFx().finally(refresh);
+setInterval(tick, 1000);
+setInterval(loadFx, 6*3600*1000);
+})();
+</script>
+</body>
+</html>
